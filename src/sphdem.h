@@ -56,8 +56,8 @@ typedef Particles<DemTuple> DemType;
 				const GET_TUPLE(Vect3d,v0j,DEM_VELOCITY0,j)
 
 
-enum {SPH_FORCE, SPH_VELOCITY, SPH_VELOCITY0,SPH_FORCE0,SPH_DENS, SPH_POROSITY, SPH_H, SPH_DDDT,SPH_PDR2,SPH_OMEGA,SPH_FIXED,SPH_FORCE_EXT};
-typedef std::tuple<Vect3d,Vect3d,Vect3d,Vect3d,double,double,double,double,double,double,bool,Vect3d> SphTuple;
+enum {SPH_FORCE, SPH_VELOCITY, SPH_VELOCITY0,SPH_FORCE0,SPH_DENS, SPH_POROSITY, SPH_H, SPH_DDDT,SPH_PDR2,SPH_OMEGA,SPH_FIXED,SPH_FORCE_EXT,SPH_KAPPA};
+typedef std::tuple<Vect3d,Vect3d,Vect3d,Vect3d,double,double,double,double,double,double,bool,Vect3d,double> SphTuple;
 typedef Particles<SphTuple> SphType;
 
 #define REGISTER_SPH_PARTICLE(particle) \
@@ -73,7 +73,8 @@ typedef Particles<SphTuple> SphType;
 				GET_TUPLE(double,pdr2,SPH_PDR2,particle); \
 				GET_TUPLE(Vect3d,f0,SPH_FORCE0,particle); \
 				GET_TUPLE(Vect3d,fext,SPH_FORCE_EXT,particle); \
-				GET_TUPLE(double,omega,SPH_OMEGA,particle)
+				GET_TUPLE(double,omega,SPH_OMEGA,particle); \
+				GET_TUPLE(double,kappa,SPH_KAPPA,particle)
 
 #define REGISTER_NEIGHBOUR_SPH_PARTICLE(tuple) \
 				const Vect3d& dx = std::get<1>(tuple); \
@@ -90,7 +91,9 @@ typedef Particles<SphTuple> SphType;
 				const GET_TUPLE(double,pdr2j,SPH_PDR2,j); \
 				const GET_TUPLE(Vect3d,f0j,SPH_FORCE0,j); \
 				const GET_TUPLE(Vect3d,fextj,SPH_FORCE_EXT,j); \
-				const GET_TUPLE(double,omegaj,SPH_OMEGA,j)
+				const GET_TUPLE(double,omegaj,SPH_OMEGA,j); \
+				const GET_TUPLE(double,kappaj,SPH_KAPPA,j)
+
 
 struct Params {
 	double sph_dt,sph_mass,sph_hfac,sph_visc,sph_refd,sph_gamma,sph_spsound,sph_prb,sph_dens;
@@ -201,13 +204,13 @@ void sphdem(ptr<SphType> sph,ptr<DemType> dem,
 
 
 	/*
-	 * Calculate omega
+	 * Calculate omega and kappa
 	 */
 	//std::cout << "calculate omega"<<std::endl;
 
-	std::for_each(sph->begin(),sph->end(),[sph,sph_mass](SphType::Value& i) {
+	std::for_each(sph->begin(),sph->end(),[sph,dem,sph_mass](SphType::Value& i) {
 		REGISTER_SPH_PARTICLE(i);
-		omega = -sph_mass*(0+NDIM/pow(h,NDIM)*K(0,h));
+		double alpha = -(0+NDIM/pow(h,NDIM)*K(0,h));
 		for (auto tpl: i.get_neighbours(sph)) {
 			REGISTER_NEIGHBOUR_SPH_PARTICLE(tpl);
 			const double r2 = dx.squaredNorm();
@@ -215,9 +218,25 @@ void sphdem(ptr<SphType> sph,ptr<DemType> dem,
 			if (r2 == 0) continue;
 			const double r = sqrt(r2);
 			const double q = r/h;
-			omega -= sph_mass*(r2*F(q,h)+NDIM/pow(h,NDIM)*K(q,h));
+			alpha -= (r2*F(q,h)+(NDIM/pow(h,NDIM))*K(q,h));
 		}
-		omega = 1.0 + omega/(rho*NDIM);
+		double beta = 0;
+		e = 1;
+		for (auto tpl: i.get_neighbours(dem)) {
+			REGISTER_NEIGHBOUR_DEM_PARTICLE(tpl);
+			const double r2 = dx.squaredNorm();
+			if (r2 > 4.0*h*h) continue;
+			if (r2 == 0) continue;
+			const double r = sqrt(r2);
+			const double q = r/h;
+			const double Wab = (1.0/pow(h,NDIM))*K(q,h);
+			beta -= (r2*F(q,h)+NDIM*Wab);
+			e -= dem_vol*W(r/h,h);
+		}
+		alpha *= sph_mass/h;
+		beta *= dem_vol/h;
+
+		omega =
 		//std::cout << "omega = "<<omega<<" rho = "<<rho<<" ndim = "<<NDIM<<std::endl;
 	});
 

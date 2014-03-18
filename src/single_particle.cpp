@@ -27,10 +27,6 @@
 
 #include <vtkFloatArray.h>
 
-int calc_part_num(double diam, double L){
-	int num = int(L/diam);
-	return num;
-}
 
 int main(int argc, char **argv) {
 	auto dem = DemType::New();
