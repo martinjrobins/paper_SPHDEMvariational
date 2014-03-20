@@ -73,6 +73,7 @@ int main(int argc, char **argv) {
 
 	params->dem_time_drop = params->sph_dt*100;
 	params->time = 0;
+	params->sph_maxh = params->sph_hfac*psep;
 
 
 	/*
@@ -113,15 +114,16 @@ int main(int argc, char **argv) {
 	 */
 	sph->create_particles_grid(min,max,Vect3i(nx,nx,nx+3),[psep,params](SphType::Value& i) {
 		REGISTER_SPH_PARTICLE(i);
-		h = params->sph_hfac*psep;
+		h = params->sph_maxh;
 		omega = 1.0;
+		kappa = 0.0;
 		v << 0,0,0;
 		v0 << 0,0,0;
 		dddt = 0;
 		e = 1;
 		rho = params->sph_dens;
 		f << 0,0,0;
-		f0 << 0,0,0;
+		fdrag << 0,0,0;
 		if ((r[1]<2) || (r[1]>nx-2)){
 			fixed = true;
 		} else {
@@ -156,7 +158,7 @@ int main(int argc, char **argv) {
 
 
 	std::cout << "starting...."<<std::endl;
-	sph->init_neighbour_search(min,max,2*params->sph_hfac*psep,periodic);
+	sph->init_neighbour_search(min,max,2*params->sph_maxh,periodic);
 	dem->init_neighbour_search(min,max,params->dem_diameter,periodic);
 
 	for (int i = 0; i < nout; ++i) {
