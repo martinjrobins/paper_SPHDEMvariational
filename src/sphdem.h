@@ -207,10 +207,10 @@ void sphdem(ptr<SphType> sph,ptr<DemType> dem,
 	 * Calculate omega and kappa
 	 */
 	//std::cout << "calculate omega"<<std::endl;
-
+	dem->reset_neighbour_search(2.0*maxh);
 	std::for_each(sph->begin(),sph->end(),[sph,dem,sph_mass](SphType::Value& i) {
 		REGISTER_SPH_PARTICLE(i);
-		double alpha = -(0+NDIM/pow(h,NDIM)*K(0,h));
+		double alpha = (0+NDIM*W(0,h));
 		for (auto tpl: i.get_neighbours(sph)) {
 			REGISTER_NEIGHBOUR_SPH_PARTICLE(tpl);
 			const double r2 = dx.squaredNorm();
@@ -218,7 +218,7 @@ void sphdem(ptr<SphType> sph,ptr<DemType> dem,
 			if (r2 == 0) continue;
 			const double r = sqrt(r2);
 			const double q = r/h;
-			alpha -= (r2*F(q,h)+(NDIM/pow(h,NDIM))*K(q,h));
+			alpha -= (r2*F(q,h)+NDIM*W(q,h));
 		}
 		double beta = 0;
 		e = 1;
@@ -226,19 +226,28 @@ void sphdem(ptr<SphType> sph,ptr<DemType> dem,
 			REGISTER_NEIGHBOUR_DEM_PARTICLE(tpl);
 			const double r2 = dx.squaredNorm();
 			if (r2 > 4.0*h*h) continue;
-			if (r2 == 0) continue;
 			const double r = sqrt(r2);
 			const double q = r/h;
-			const double Wab = (1.0/pow(h,NDIM))*K(q,h);
-			beta -= (r2*F(q,h)+NDIM*Wab);
-			e -= dem_vol*W(r/h,h);
+			const double Wab = W(q,h);
+			if (r2 == 0) {
+				beta -= (0+NDIM*Wab);
+				e -= dem_vol*Wab;
+			} else {
+				beta -= (r2*F(q,h)+NDIM*Wab);
+				e -= dem_vol*Wab;
+			}
 		}
 		alpha *= sph_mass/h;
 		beta *= dem_vol/h;
 
-		omega =
-		//std::cout << "omega = "<<omega<<" rho = "<<rho<<" ndim = "<<NDIM<<std::endl;
+		const double invDe = 1.0/(NDIM*e);
+		const double betaf = beta*h*invDe;
+		const double alphaf = h*alpha*invDe;
+		omega = 1.0/(e + (h/(NDIM*rho))*(alpha + beta/(1.0-betaf))*(rho + alphaf));
+		kappa = (rho + alphaf)/(1-betaf);
+		std::cout << "omega = "<<omega<<" rho = "<<rho<<" kappa = "<<kappa<<std::endl;
 	});
+	dem->reset_neighbour_search(dem_diameter);
 
 	/*
 	 * Calculate change in density
@@ -258,7 +267,7 @@ void sphdem(ptr<SphType> sph,ptr<DemType> dem,
 
 			dddt += sph_mass*(v-vj).dot(dx*F(r/h,h));
 		}
-		dddt *= 1.0/omega;
+		dddt *= omega;
 
 	});
 
@@ -333,7 +342,7 @@ void sphdem(ptr<SphType> sph,ptr<DemType> dem,
 		pdr2 = press/pow(rho,2);
 		return r + dt/2 * v0;
 	});
-	dem->reset_neighbour_search(2.0*maxh);
+
 
 
 	/*
@@ -390,7 +399,6 @@ void sphdem(ptr<SphType> sph,ptr<DemType> dem,
 		f0 /= rho;
 	});
 
-	dem->reset_neighbour_search(dem_diameter);
 
 	/*
 	 * acceleration on SPH calculation
