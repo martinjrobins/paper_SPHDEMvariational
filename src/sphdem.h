@@ -246,9 +246,9 @@ void sphdem(ptr<SphType> sph,ptr<DemType> dem,
 		const double invDe = 1.0/(NDIM*e);
 		const double betaf = beta*h*invDe;
 		const double alphaf = h*alpha*invDe;
-		omega = 1.0/(e + (h/(NDIM*rho))*(alpha + beta/(1.0-betaf))*(rho + alphaf));
+		omega = 1.0/(e + (h/(NDIM*rho))*(alpha + (beta/(1.0-betaf))*(rho + alphaf)));
 		kappa = (rho + alphaf)/(1-betaf);
-		std::cout << "omega = "<<omega<<" rho = "<<rho<<" kappa = "<<kappa<<std::endl;
+		std::cout << "e = "<<e<<" omega = "<<omega<<" rho = "<<rho<<" kappa = "<<kappa<<" alpha = "<<alpha<<" beta = "<<beta<<std::endl;
 	});
 
 	/*
