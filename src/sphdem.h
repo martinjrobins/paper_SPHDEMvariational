@@ -248,7 +248,7 @@ void sphdem(ptr<SphType> sph,ptr<DemType> dem,
 		const double alphaf = h*alpha*invDe;
 		omega = 1.0/(e + (h/(NDIM*rho))*(alpha + (beta/(1.0-betaf))*(rho + alphaf)));
 		kappa = (rho + alphaf)/(1-betaf);
-		std::cout << "e = "<<e<<" omega = "<<omega<<" rho = "<<rho<<" kappa = "<<kappa<<" alpha = "<<alpha<<" beta = "<<beta<<std::endl;
+		//std::cout << "e = "<<e<<" omega = "<<omega<<" rho = "<<rho<<" kappa = "<<kappa<<" alpha = "<<alpha<<" beta = "<<beta<<std::endl;
 	});
 
 	/*
@@ -370,7 +370,6 @@ void sphdem(ptr<SphType> sph,ptr<DemType> dem,
 	 * Calculate drag force on SPH
 	 */
 	//std::cout << "calculate coupling force on sph"<<std::endl;
-	dem->reset_neighbour_search(2.0*sph_maxh);
 	std::for_each(sph->begin(),sph->end(),[dem,dem_mass](SphType::Value& i) {
 		REGISTER_SPH_PARTICLE(i);
 		fdrag << 0,0,0;
