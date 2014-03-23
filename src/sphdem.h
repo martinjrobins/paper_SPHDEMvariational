@@ -225,6 +225,7 @@ void sphdem(ptr<SphType> sph,ptr<DemType> dem,
 		}
 		double beta = 0;
 		e = 1;
+		//bool found = false;
 		for (auto tpl: i.get_neighbours(dem)) {
 			REGISTER_NEIGHBOUR_DEM_PARTICLE(tpl);
 			const double r2 = dx.squaredNorm();
@@ -239,6 +240,7 @@ void sphdem(ptr<SphType> sph,ptr<DemType> dem,
 				beta -= (r2*F(q,h)+NDIM*Wab);
 				e -= dem_vol*Wab;
 			}
+			//found = true;
 		}
 		alpha *= sph_mass/h;
 		beta *= dem_vol/h;
@@ -247,8 +249,8 @@ void sphdem(ptr<SphType> sph,ptr<DemType> dem,
 		const double betaf = beta*h*invDe;
 		const double alphaf = h*alpha*invDe;
 		omega = 1.0/(e + (h/(NDIM*rho))*(alpha + (beta/(1.0-betaf))*(rho + alphaf)));
-		kappa = (rho + alphaf)/(1-betaf);
-		//std::cout << "e = "<<e<<" omega = "<<omega<<" rho = "<<rho<<" kappa = "<<kappa<<" alpha = "<<alpha<<" beta = "<<beta<<std::endl;
+		kappa = (rho + alphaf)/(1.0-betaf);
+		//if (found) std::cout << "dem_vol = "<<dem_vol<<" e = "<<e<<" omega = "<<omega<<" rho = "<<rho<<" kappa = "<<kappa<<" alpha = "<<alpha<<" beta = "<<beta<<std::endl;
 	});
 
 	/*
@@ -347,7 +349,7 @@ void sphdem(ptr<SphType> sph,ptr<DemType> dem,
 			/*
 			 * pressure gradient from fluid
 			 */
-			f0 += sph_mass*omegaj*pdr2j*kappaj*fdashj*dx;
+			f0 -= sph_mass*omegaj*pdr2j*kappaj*fdashj*dx;
 
 
 		}
@@ -379,8 +381,10 @@ void sphdem(ptr<SphType> sph,ptr<DemType> dem,
 			if (r2 > 4.0*h*h) continue;
 			const double r = sqrt(r2);
 			fdrag -= dem_mass*fdragj*W(r/h,h)/sj;
+
 		}
 		fdrag /= rho;
+
 	});
 
 	/*
@@ -423,6 +427,7 @@ void sphdem(ptr<SphType> sph,ptr<DemType> dem,
 			const double r = sqrt(r2);
 			fdem -= dem_vol*F(r/h,h)*dx;
 		}
+		//std::cout <<"fdem = "<<fdem<<std::endl;
 		f += pdr2*omega*kappa*fdem;
 
 	});

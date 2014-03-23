@@ -45,9 +45,9 @@ int main(int argc, char **argv) {
 	params->dem_diameter = 0.0011;
 	params->dem_gamma = 0.0004;
 	params->dem_k = 1.0e01;
-	const double dem_vol = (1.0/6.0)*PI*pow(params->dem_diameter,3);
+	params->dem_vol = (1.0/6.0)*PI*pow(params->dem_diameter,3);
 	const double dem_dens = 1160.0;
-	params->dem_mass = dem_vol*dem_dens;
+	params->dem_mass = params->dem_vol*dem_dens;
 	const double dem_min_reduced_mass = 0.5*params->dem_mass;
 	params->dem_dt = (1.0/50.0)*PI/sqrt(params->dem_k/dem_min_reduced_mass-pow(0.5*params->dem_gamma/dem_min_reduced_mass,2));
 
