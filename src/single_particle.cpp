@@ -33,7 +33,7 @@ int main(int argc, char **argv) {
 	auto sph = SphType::New();
 	auto params = ptr<Params>(new Params());
 
-	const int timesteps = 5000;
+	const int timesteps = 50000;
 	const int nout = 100;
 	const int timesteps_per_out = timesteps/nout;
 	const double L = 31.0/1000.0;
@@ -71,7 +71,7 @@ int main(int argc, char **argv) {
 
 	std::cout << "h = "<<params->sph_hfac*psep<<" vmax = "<<VMAX<<std::endl;
 
-	params->dem_time_drop = params->sph_dt*100;
+	params->dem_time_drop = params->sph_dt*timesteps/4.0;
 	params->time = 0;
 	params->sph_maxh = params->sph_hfac*psep;
 

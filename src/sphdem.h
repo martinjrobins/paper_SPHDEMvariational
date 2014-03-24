@@ -213,7 +213,7 @@ void sphdem(ptr<SphType> sph,ptr<DemType> dem,
 	//std::cout << "calculate omega"<<std::endl;
 	std::for_each(sph->begin(),sph->end(),[sph,dem,sph_mass,dem_vol](SphType::Value& i) {
 		REGISTER_SPH_PARTICLE(i);
-		double alpha = (0+NDIM*W(0,h));
+		double alpha = -(0+NDIM*W(0,h));
 		for (auto tpl: i.get_neighbours(sph)) {
 			REGISTER_NEIGHBOUR_SPH_PARTICLE(tpl);
 			const double r2 = dx.squaredNorm();
@@ -248,8 +248,8 @@ void sphdem(ptr<SphType> sph,ptr<DemType> dem,
 		const double invDe = 1.0/(NDIM*e);
 		const double betaf = beta*h*invDe;
 		const double alphaf = h*alpha*invDe;
-		omega = 1.0/(e + (h/(NDIM*rho))*(alpha + (beta/(1.0-betaf))*(rho + alphaf)));
 		kappa = (rho + alphaf)/(1.0-betaf);
+		omega = 1.0/(e + (h/(NDIM*rho))*(alpha + beta*kappa));
 		//if (found) std::cout << "dem_vol = "<<dem_vol<<" e = "<<e<<" omega = "<<omega<<" rho = "<<rho<<" kappa = "<<kappa<<" alpha = "<<alpha<<" beta = "<<beta<<std::endl;
 	});
 
@@ -333,11 +333,14 @@ void sphdem(ptr<SphType> sph,ptr<DemType> dem,
 		s = 0;
 		Vect3d vf(0,0,0);
 		double ef = 0;
+		f0 << 0,0,0;
+		double omegad = 0;
+		double kappad = 0;
+		int n = 0;
 		for (auto tpl: i.get_neighbours(sph)) {
 			REGISTER_NEIGHBOUR_SPH_PARTICLE(tpl);
 			const double r2 = dx.squaredNorm();
 			if (r2 > 4.0*hj*hj) continue;
-			if (r2 == 0) continue;
 			const double r = sqrt(r2);
 			const double q = r/hj;
 			const double dvWab = sph_mass*W(r/hj,hj)/rhoj;
@@ -345,18 +348,24 @@ void sphdem(ptr<SphType> sph,ptr<DemType> dem,
 			ef += ej*dvWab;
 			s += dvWab;
 
-			const double fdashj = F(q,hj);
 			/*
 			 * pressure gradient from fluid
 			 */
-			f0 -= sph_mass*omegaj*pdr2j*kappaj*fdashj*dx;
-
+			if (r > 0) {
+				const double fdashj = F(q,hj);
+				f0 -= sph_mass*omegaj*pdr2j*kappaj*fdashj*dx;
+				omegad += omegaj;
+				kappad += kappaj;
+				n++;
+			}
 
 		}
+		omegad /= n;
+		kappad /= n;
 		vf /= s;
 		ef /= s;
 		f0 *= (dem_vol/dem_mass);
-
+		//std::cout <<"f0 = "<<f0<<" omega = "<<omegad<<" kappa = "<<kappad<<std::endl;
 		/*
 		 * drag (stokes)
 		 */
