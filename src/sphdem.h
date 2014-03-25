@@ -98,7 +98,7 @@ typedef Particles<SphTuple> SphType;
 
 
 struct Params {
-	double sph_dt,sph_mass,sph_hfac,sph_visc,sph_refd,sph_gamma,sph_spsound,sph_prb,sph_dens,sph_maxh;
+	double sph_dt,sph_mass,sph_hfac,sph_visc,sph_refd,sph_gamma,sph_spsound,sph_prb,sph_dens,sph_maxh,sph_time_damping;
 	double dem_dt,dem_mass,dem_diameter,dem_k,dem_gamma, dem_vol, dem_time_drop;
 	double time;
 };
@@ -201,9 +201,10 @@ void sphdem(ptr<SphType> sph,ptr<DemType> dem,
 	integrate_dem(dt/2,dem,params,dem_geometry); //update dem positions
 	dem->reset_neighbour_search(2.0*sph_maxh);
 
-	sph->update_positions(sph->begin(),sph->end(),[dt,sph_mass](SphType::Value& i) {
+	sph->update_positions(sph->begin(),sph->end(),[dt,sph_mass,params](SphType::Value& i) {
 		REGISTER_SPH_PARTICLE(i);
 		if (!fixed) v += dt/2 * (f+fdrag+fext);
+		if (params->time < params->sph_time_damping) v *= 0.98;
 		return r + dt/2 * v;
 	});
 
@@ -446,7 +447,7 @@ void sphdem(ptr<SphType> sph,ptr<DemType> dem,
 	 */
 	//std::cout << "1/2 -> 1 step for velocity"<<std::endl;
 
-	std::for_each(sph->begin(),sph->end(),[dt](SphType::Value& i) {
+	std::for_each(sph->begin(),sph->end(),[dt,params](SphType::Value& i) {
 		REGISTER_SPH_PARTICLE(i);
 
 		if (!fixed) v = v0 + dt/2 * (f+fdrag+fext);
@@ -458,6 +459,5 @@ void sphdem(ptr<SphType> sph,ptr<DemType> dem,
 	params->time += params->sph_dt;
 	params->sph_dt = std::min(0.25*minh/params->sph_spsound,0.125*pow(minh,2)/params->sph_visc);
 }
-
 
 #endif /* SPHDEM_H_ */
