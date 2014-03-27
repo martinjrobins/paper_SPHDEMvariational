@@ -335,9 +335,9 @@ void sphdem(ptr<SphType> sph,ptr<DemType> dem,
 		Vect3d vf(0,0,0);
 		double ef = 0;
 		f0 << 0,0,0;
-		double omegad = 0;
-		double kappad = 0;
-		int n = 0;
+//		double omegad = 0;
+//		double kappad = 0;
+//		int n = 0;
 		for (auto tpl: i.get_neighbours(sph)) {
 			REGISTER_NEIGHBOUR_SPH_PARTICLE(tpl);
 			const double r2 = dx.squaredNorm();
@@ -355,14 +355,16 @@ void sphdem(ptr<SphType> sph,ptr<DemType> dem,
 			if (r > 0) {
 				const double fdashj = F(q,hj);
 				f0 -= sph_mass*omegaj*pdr2j*kappaj*fdashj*dx;
-				omegad += omegaj;
-				kappad += kappaj;
-				n++;
+//				omegad += omegaj;
+//				kappad += kappaj;
+//				n++;
 			}
 
 		}
-		omegad /= n;
-		kappad /= n;
+//		if (n!=0) {
+//			omegad /= n;
+//			kappad /= n;
+		//		}
 		vf /= s;
 		ef /= s;
 		f0 *= (dem_vol/dem_mass);
@@ -434,6 +436,7 @@ void sphdem(ptr<SphType> sph,ptr<DemType> dem,
 			REGISTER_NEIGHBOUR_DEM_PARTICLE(tpl);
 			const double r2 = dx.squaredNorm();
 			if (r2 > 4.0*h*h) continue;
+			if (r2 == 0) continue;
 			const double r = sqrt(r2);
 			fdem -= dem_vol*F(r/h,h)*dx;
 		}

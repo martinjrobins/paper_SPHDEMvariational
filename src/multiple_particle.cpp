@@ -74,7 +74,7 @@ int main(int argc, char **argv) {
 	std::cout << "h = "<<params->sph_hfac*psep<<" vmax = "<<VMAX<<std::endl;
 
 	params->dem_time_drop = params->sph_dt*timesteps;
-	params->sph_time_damping = params->sph_dt*200;
+	params->sph_time_damping = params->sph_dt*500;
 	params->time = 0;
 	params->sph_maxh = params->sph_hfac*psep;
 
@@ -111,13 +111,13 @@ int main(int argc, char **argv) {
 	const double dem_width = L/4;
 	const Vect3d min(0,0,0);
 	const Vect3d max(L,L,L);
-	const Vect3d dem_min(min[0],min[1],0.5*(L-dem_width));
-	const Vect3d dem_max(max[0],max[1],0.5*(L+dem_width));
+	const Vect3d dem_min(0.25*L,0.25*L,0.5*(L-dem_width));
+	const Vect3d dem_max(0.75*L,0.75*L,0.5*(L+dem_width));
 	const Vect3b periodic(true,true,false);
 	const Vect3i sph_n = ((max-min)/psep).cast<int>();
 	const Vect3d sph_psep = (max-min).cwiseQuotient(sph_n.cast<double>());
 	const Vect3d min_domain(0,0,-3*sph_psep[2]);
-	const Vect3d max_domain(max[0],max[1],1.5*L);
+	const Vect3d max_domain(max[0],max[1],2.0*L);
 
 	const Vect3i dem_n = ((dem_max-dem_min)/goal_dem_psep).cast<int>();
 	const Vect3d dem_psep = (dem_max-dem_min).cwiseQuotient(dem_n.cast<double>());
