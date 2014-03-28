@@ -332,21 +332,28 @@ void sphdem(ptr<SphType> sph,ptr<DemType> dem,
 		REGISTER_DEM_PARTICLE(i);
 
 		s = 0;
-		Vect3d vf(0,0,0);
-		double ef = 0;
 		f0 << 0,0,0;
-//		double omegad = 0;
-//		double kappad = 0;
-//		int n = 0;
+		fdrag << 0,0,0;
 		for (auto tpl: i.get_neighbours(sph)) {
 			REGISTER_NEIGHBOUR_SPH_PARTICLE(tpl);
 			const double r2 = dx.squaredNorm();
 			if (r2 > 4.0*hj*hj) continue;
 			const double r = sqrt(r2);
 			const double q = r/hj;
-			const double dvWab = sph_mass*W(r/hj,hj)/rhoj;
-			vf += vj*dvWab;
-			ef += ej*dvWab;
+			const double dvWab = sph_mass*W(q,hj)/rhoj;
+			const Vect3d dv = (v-vj);
+			const double dv_mod2 = dv.squaredNorm();
+
+			/*
+			 * drag term
+			 */
+			if (dv_mod2 > 0) {
+				const double dv_mod = sqrt(dv_mod2);
+				const double Rep = dem_diameter*ej*dv_mod/sph_visc;
+				const double Cd = 24.0/Rep;
+				const double beta_times_vol = (1.0/8.0)*Cd*PI*rhoj*pow(dem_diameter,2)*dv_mod;
+				fdrag -= beta_times_vol*dv*dvWab;
+			}
 			s += dvWab;
 
 			/*
@@ -355,56 +362,24 @@ void sphdem(ptr<SphType> sph,ptr<DemType> dem,
 			if (r > 0) {
 				const double fdashj = F(q,hj);
 				f0 -= sph_mass*omegaj*pdr2j*kappaj*fdashj*dx;
-//				omegad += omegaj;
-//				kappad += kappaj;
-//				n++;
-			}
 
+			}
 		}
-//		if (n!=0) {
-//			omegad /= n;
-//			kappad /= n;
-		//		}
-		vf /= s;
-		ef /= s;
+
+		if (s>0) fdrag = fdrag / (s*dem_mass);
 		f0 *= (dem_vol/dem_mass);
 		//std::cout <<"f0 = "<<f0<<" omega = "<<omegad<<" kappa = "<<kappad<<std::endl;
-		/*
-		 * drag (stokes)
-		 */
-		if (s > 0.5) {
-			fdrag = 3.0*PI*sph_visc*sph_dens*dem_diameter*ef*(vf-v)/dem_mass;
-			//std::cout <<"v = "<<v<<" vf = "<<vf<<" f0 = "<<f0<<" fdrag = "<<fdrag<<std::endl;
-		} else {
-			fdrag << 0,0,0;
-		}
-	});
-
-	/*
-	 * Calculate drag force on SPH
-	 */
-	//std::cout << "calculate coupling force on sph"<<std::endl;
-	std::for_each(sph->begin(),sph->end(),[dem,dem_mass](SphType::Value& i) {
-		REGISTER_SPH_PARTICLE(i);
-		fdrag << 0,0,0;
-		for (auto tpl: i.get_neighbours(dem)) {
-			REGISTER_NEIGHBOUR_DEM_PARTICLE(tpl);
-			const double r2 = dx.squaredNorm();
-			if (r2 > 4.0*h*h) continue;
-			const double r = sqrt(r2);
-			fdrag -= dem_mass*fdragj*W(r/h,h)/sj;
-
-		}
-		fdrag /= rho;
 
 	});
+
+
 
 	/*
 	 * acceleration on SPH calculation
 	 */
 	//std::cout << "acceleration on SPH"<<std::endl;
 
-	std::for_each(sph->begin(),sph->end(),[sph,dem,&sph_geometry,sph_mass,sph_visc,dem_vol](SphType::Value& i) {
+	std::for_each(sph->begin(),sph->end(),[sph,dem,&sph_geometry,sph_mass,sph_visc,dem_vol,dem_diameter](SphType::Value& i) {
 		REGISTER_SPH_PARTICLE(i);
 
 		f << 0,0,0;
@@ -432,14 +407,38 @@ void sphdem(ptr<SphType> sph,ptr<DemType> dem,
 		}
 
 		Vect3d fdem(0,0,0);
+		fdrag << 0,0,0;
+		e = 1;
 		for (auto tpl: i.get_neighbours(dem)) {
 			REGISTER_NEIGHBOUR_DEM_PARTICLE(tpl);
 			const double r2 = dx.squaredNorm();
 			if (r2 > 4.0*h*h) continue;
-			if (r2 == 0) continue;
 			const double r = sqrt(r2);
-			fdem -= dem_vol*F(r/h,h)*dx;
+			const double q = r/h;
+			const Vect3d dv = (v-vj);
+			const double dv_mod2 = dv.squaredNorm();
+			const double Wab = W(q,h);
+			e -= dem_vol*Wab;
+
+
+			/*
+			 * drag term
+			 */
+			if (dv_mod2 > 0) {
+				const double dv_mod = sqrt(dv_mod2);
+				const double Rep = dem_diameter*e*dv_mod/sph_visc;
+				const double Cd = 24.0/Rep;
+				const double beta_times_vol = (1.0/8.0)*Cd*PI*rho*pow(dem_diameter,2)*dv_mod;
+				fdrag -= beta_times_vol*dv*Wab;
+			}
+
+			/*
+			 * dem pressure term
+			 */
+			if (r>0) fdem -= dem_vol*F(q,h)*dx;
+
 		}
+		if (e<1.0) fdrag /= (rho*e);
 		//std::cout <<"fdem = "<<fdem<<std::endl;
 		f += pdr2*omega*kappa*fdem;
 
