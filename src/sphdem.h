@@ -420,7 +420,7 @@ void sphdem(ptr<SphType> sph,ptr<DemType> dem,
 				const double dv_mod = sqrt(dv_mod2);
 				const double Rep = dem_diameter*ej*dv_mod/sph_visc;
 				const double Cd = 24.0/Rep;
-				const double beta_times_vol = (1.0/8.0)*Cd*PI*rhoj*pow(dem_diameter,2)*dv_mod;
+				const double beta_times_vol = (1.0/8.0)*Cd*PI*sph_dens*pow(dem_diameter,2)*dv_mod;
 				fdrag -= beta_times_vol*dv*sph_mass*W(q,hj)/(ej*rhoj);
 			}
 			/*

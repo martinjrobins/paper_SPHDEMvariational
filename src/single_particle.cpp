@@ -33,20 +33,20 @@ int main(int argc, char **argv) {
 	auto sph = SphType::New();
 	auto params = ptr<Params>(new Params());
 
-	const int timesteps = 50000;
+	const int timesteps = 20000;
 	const int nout = 100;
 	const int timesteps_per_out = timesteps/nout;
-	const double L = 31.0/1000.0;
+	const double L = 0.004;
 	const int nx = 10;
 
 
 	 /* dem parameters
 	 */
-	params->dem_diameter = 0.0011;
-	params->dem_gamma = 0.0004;
-	params->dem_k = 1.0e01;
+	params->dem_diameter = 0.0001;
+	params->dem_gamma = 0.0;
+	params->dem_k = 10;
 	params->dem_vol = (1.0/6.0)*PI*pow(params->dem_diameter,3);
-	const double dem_dens = 1160.0;
+	const double dem_dens = 2500.0;
 	params->dem_mass = params->dem_vol*dem_dens;
 	const double dem_min_reduced_mass = 0.5*params->dem_mass;
 	params->dem_dt = (1.0/50.0)*PI/sqrt(params->dem_k/dem_min_reduced_mass-pow(0.5*params->dem_gamma/dem_min_reduced_mass,2));
@@ -56,7 +56,7 @@ int main(int argc, char **argv) {
 	/*
 	 * sph parameters
 	 */
-	params->sph_hfac = 1.3;
+	params->sph_hfac = 1.5;
 	params->sph_visc = 8.9e-07;
 	params->sph_refd = 1000.0;
 	params->sph_dens = 1000.0;
@@ -70,6 +70,7 @@ int main(int argc, char **argv) {
 	params->sph_mass = params->sph_dens*pow(psep,NDIM);
 
 	std::cout << "h = "<<params->sph_hfac*psep<<" vmax = "<<VMAX<<std::endl;
+	std::cout << "sph_dt = "<<params->sph_dt<<" 1/20 m/b = "<<(1.0/20.0)*params->dem_mass/(3.0*PI*params->sph_dens*params->sph_visc*params->dem_diameter)<<std::endl;
 
 	params->dem_time_drop = params->sph_dt*timesteps/4.0;
 	params->time = 0;
