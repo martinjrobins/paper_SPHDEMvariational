@@ -33,22 +33,22 @@ int main(int argc, char **argv) {
 	auto sph = SphType::New();
 	auto params = ptr<Params>(new Params());
 
-	const int timesteps = 50000;
+	const int timesteps = 20000;
 	const int nout = 100;
 	const int timesteps_per_out = timesteps/nout;
-	const double L = 31.0/1000.0;
+	const double L = 0.004;
 	const int nx = 10;
 
 
 	 /* dem parameters
 	 */
 	const double porosity = 0.8;
-	params->dem_diameter = 0.0011;
-	params->dem_gamma = 0.0004;
-	params->dem_k = 1.0e01;
+	params->dem_diameter = 0.0001;
+	params->dem_gamma = 0.0;
+	params->dem_k = 10;
 	params->dem_vol = (1.0/6.0)*PI*pow(params->dem_diameter,3);
 	const double goal_dem_psep = pow(params->dem_vol/(1-porosity),1.0/NDIM);
-	const double dem_dens = 1160.0;
+	const double dem_dens = 2500.0;
 	params->dem_mass = params->dem_vol*dem_dens;
 	const double dem_min_reduced_mass = 0.5*params->dem_mass;
 	params->dem_dt = (1.0/50.0)*PI/sqrt(params->dem_k/dem_min_reduced_mass-pow(0.5*params->dem_gamma/dem_min_reduced_mass,2));
@@ -73,7 +73,7 @@ int main(int argc, char **argv) {
 
 	std::cout << "h = "<<params->sph_hfac*psep<<" vmax = "<<VMAX<<std::endl;
 
-	params->dem_time_drop = params->sph_dt*timesteps;
+	params->dem_time_drop = params->sph_dt*timesteps/4.0;
 	params->sph_time_damping = params->sph_dt*500;
 	params->time = 0;
 	params->sph_maxh = params->sph_hfac*psep;
@@ -111,8 +111,8 @@ int main(int argc, char **argv) {
 	const double dem_width = L/4;
 	const Vect3d min(0,0,0);
 	const Vect3d max(L,L,L);
-	const Vect3d dem_min(0.25*L,0.25*L,0.5*(L-dem_width));
-	const Vect3d dem_max(0.75*L,0.75*L,0.5*(L+dem_width));
+	const Vect3d dem_min(0,0,0.5*(L-dem_width));
+	const Vect3d dem_max(L,L,0.5*(L+dem_width));
 	const Vect3b periodic(true,true,false);
 	const Vect3i sph_n = ((max-min)/psep).cast<int>();
 	const Vect3d sph_psep = (max-min).cwiseQuotient(sph_n.cast<double>());
@@ -142,10 +142,12 @@ int main(int argc, char **argv) {
 		v << 0,0,0;
 		v0 << 0,0,0;
 		dddt = 0;
+		f0 << 0,0,0;
 		e = 1;
 		rho = params->sph_dens;
 		f << 0,0,0;
 		fdrag << 0,0,0;
+		f0 << 0,0,0;
 		if (r[2]<0) {
 			fixed = true;
 		} else {

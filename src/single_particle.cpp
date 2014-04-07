@@ -125,6 +125,7 @@ int main(int argc, char **argv) {
 		rho = params->sph_dens;
 		f << 0,0,0;
 		fdrag << 0,0,0;
+		f0 << 0,0,0;
 		if ((r[1]<2) || (r[1]>nx-2)){
 			fixed = true;
 		} else {

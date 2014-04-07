@@ -58,8 +58,8 @@ typedef Particles<DemTuple> DemType;
 				const GET_TUPLE(Vect3d,v0j,DEM_VELOCITY0,j)
 
 
-enum {SPH_FORCE, SPH_VELOCITY, SPH_VELOCITY0,SPH_FDRAG,SPH_FORCE_EXT,SPH_DENS,SPH_POROSITY, SPH_H, SPH_DDDT,SPH_PDR2,SPH_OMEGA,SPH_FIXED,SPH_KAPPA};
-typedef std::tuple<Vect3d,Vect3d,Vect3d,Vect3d,Vect3d,double,double,double,double,double,double,bool,double> SphTuple;
+enum {SPH_FORCE, SPH_VELOCITY, SPH_VELOCITY0,SPH_FDRAG,SPH_FORCE_EXT,SPH_FORCE0,SPH_DENS,SPH_POROSITY, SPH_H, SPH_DDDT,SPH_PDR2,SPH_OMEGA,SPH_FIXED,SPH_KAPPA};
+typedef std::tuple<Vect3d,Vect3d,Vect3d,Vect3d,Vect3d,Vect3d,double,double,double,double,double,double,bool,double> SphTuple;
 typedef Particles<SphTuple> SphType;
 
 #define REGISTER_SPH_PARTICLE(particle) \
@@ -74,6 +74,7 @@ typedef Particles<SphTuple> SphType;
 				GET_TUPLE(double,dddt,SPH_DDDT,particle); \
 				GET_TUPLE(double,pdr2,SPH_PDR2,particle); \
 				GET_TUPLE(Vect3d,fdrag,SPH_FDRAG,particle); \
+				GET_TUPLE(Vect3d,f0,SPH_FORCE0,particle); \
 				GET_TUPLE(Vect3d,fext,SPH_FORCE_EXT,particle); \
 				GET_TUPLE(double,omega,SPH_OMEGA,particle); \
 				GET_TUPLE(double,kappa,SPH_KAPPA,particle)
@@ -92,6 +93,7 @@ typedef Particles<SphTuple> SphType;
 				const GET_TUPLE(double,dddtj,SPH_DDDT,j); \
 				const GET_TUPLE(double,pdr2j,SPH_PDR2,j); \
 				const GET_TUPLE(Vect3d,fdragj,SPH_FDRAG,j); \
+				const GET_TUPLE(Vect3d,f0j,SPH_FORCE0,j); \
 				const GET_TUPLE(Vect3d,fextj,SPH_FORCE_EXT,j); \
 				const GET_TUPLE(double,omegaj,SPH_OMEGA,j); \
 				const GET_TUPLE(double,kappaj,SPH_KAPPA,j)
@@ -203,7 +205,7 @@ void sphdem(ptr<SphType> sph,ptr<DemType> dem,
 
 	sph->update_positions(sph->begin(),sph->end(),[dt,sph_mass,params](SphType::Value& i) {
 		REGISTER_SPH_PARTICLE(i);
-		if (!fixed) v += dt/2 * (f+fdrag+fext);
+		if (!fixed) v += dt/2 * (f+f0+fdrag+fext);
 		if (params->time < params->sph_time_damping) v *= 0.98;
 		return r + dt/2 * v;
 	});
@@ -317,7 +319,7 @@ void sphdem(ptr<SphType> sph,ptr<DemType> dem,
 	sph->reset_neighbour_search(2.0*sph_maxh,[dt,sph_mass,sph_prb,sph_refd,sph_gamma](SphType::Value& i) {
 		REGISTER_SPH_PARTICLE(i);
 		v0 = v;
-		if (!fixed) v += dt/2 * (f+fdrag+fext);
+		if (!fixed) v += dt/2 * (f+f0+fdrag+fext);
 		const double press = sph_prb*(pow(rho/sph_refd,sph_gamma) - 1.0);
 		pdr2 = press/pow(rho,2);
 		return r + dt/2 * v0;
@@ -391,7 +393,7 @@ void sphdem(ptr<SphType> sph,ptr<DemType> dem,
 		}
 		fdrag /= (rho*e);
 		//std::cout <<"fdem = "<<fdem<<std::endl;
-		f += pdr2*omega*kappa*fdem;
+		f0 = pdr2*omega*kappa*fdem;
 
 	});
 
@@ -404,6 +406,7 @@ void sphdem(ptr<SphType> sph,ptr<DemType> dem,
 
 		f0 << 0,0,0;
 		fdrag << 0,0,0;
+		s = 0;
 		for (auto tpl: i.get_neighbours(sph)) {
 			REGISTER_NEIGHBOUR_SPH_PARTICLE(tpl);
 			const double r2 = dx.squaredNorm();
@@ -412,28 +415,39 @@ void sphdem(ptr<SphType> sph,ptr<DemType> dem,
 			const double q = r/hj;
 			const Vect3d dv = (v-vj);
 			const double dv_mod2 = dv.squaredNorm();
-
+			const double Wdv = sph_mass*W(q,hj)/rhoj;
+			s += Wdv;
 			/*
 			 * drag term
 			 */
 			if (dv_mod2 > 0) {
 				const double dv_mod = sqrt(dv_mod2);
+
 				const double Rep = dem_diameter*ej*dv_mod/sph_visc;
 				const double Cd = 24.0/Rep;
-				const double beta_times_vol = (1.0/8.0)*Cd*PI*sph_dens*pow(dem_diameter,2)*dv_mod;
-				fdrag -= beta_times_vol*dv*sph_mass*W(q,hj)/(ej*rhoj);
+				const double beta_times_vol = (1.0/8.0)*Cd*PI*rhoj*pow(dem_diameter,2)*dv_mod;
+				fdrag -= beta_times_vol*dv*Wdv/(ej);
+
+//				const double Rep = dem_diameter*dv_mod/sph_visc;
+//				const double Cd = 24.0/Rep;
+//				const double beta_times_vol = (1.0/8.0)*Cd*PI*sph_dens*pow(dem_diameter,2)*dv_mod;
+//				fdrag = -beta_times_vol*v;
+
+
 			}
 			/*
 			 * pressure gradient from fluid
 			 */
-			if (r > 0) {
-				const double fdashj = F(q,hj);
-				f0 -= sph_mass*omegaj*pdr2j*kappaj*fdashj*dx;
-
-			}
+//			if (r > 0) {
+//				const double fdashj = F(q,hj);
+//				f0 -= sph_mass*omegaj*pdr2j*kappaj*fdashj*dx;
+//
+//			}
+			f0 += fj*Wdv;
 		}
 
 		fdrag /= dem_mass;
+		f0 *= sph_dens/s;
 		f0 *= (dem_vol/dem_mass);
 		//std::cout <<"f0 = "<<f0<<" omega = "<<omegad<<" kappa = "<<kappad<<std::endl;
 
@@ -448,7 +462,7 @@ void sphdem(ptr<SphType> sph,ptr<DemType> dem,
 	std::for_each(sph->begin(),sph->end(),[dt,params](SphType::Value& i) {
 		REGISTER_SPH_PARTICLE(i);
 
-		if (!fixed) v = v0 + dt/2 * (f+fdrag+fext);
+		if (!fixed) v = v0 + dt/2 * (f+f0+fdrag+fext);
 	});
 
 	/*
