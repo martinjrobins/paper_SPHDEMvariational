@@ -391,7 +391,11 @@ void sphdem(ptr<SphType> sph,ptr<DemType> dem,
 			if (r>0) fdem -= dem_vol*F(q,h)*dx;
 
 		}
-		fdrag /= (rho*e);
+		if (e > 0) {
+			fdrag /= (rho*e);
+		} else {
+			fdrag << 0,0,0;
+		}
 		//std::cout <<"fdem = "<<fdem<<std::endl;
 		f0 = pdr2*omega*kappa*fdem;
 
@@ -447,8 +451,12 @@ void sphdem(ptr<SphType> sph,ptr<DemType> dem,
 		}
 
 		fdrag /= dem_mass;
-		f0 *= sph_dens/s;
-		f0 *= (dem_vol/dem_mass);
+		if (s > 0.5) {
+			f0 *= sph_dens/s;
+			f0 *= (dem_vol/dem_mass);
+		} else {
+			f0 << 0,0,0;
+		}
 		//std::cout <<"f0 = "<<f0<<" omega = "<<omegad<<" kappa = "<<kappad<<std::endl;
 
 	});
