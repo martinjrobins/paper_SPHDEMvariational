@@ -42,7 +42,7 @@ int main(int argc, char **argv) {
 
 	 /* dem parameters
 	 */
-	const double porosity = 0.8;
+	const double porosity = 0.9;
 	params->dem_diameter = 0.0001;
 	params->dem_gamma = 0.0;
 	params->dem_k = 10;
@@ -73,8 +73,9 @@ int main(int argc, char **argv) {
 
 	std::cout << "h = "<<params->sph_hfac*psep<<" vmax = "<<VMAX<<std::endl;
 
-	params->dem_time_drop = params->sph_dt*timesteps/4.0;
 	params->sph_time_damping = params->sph_dt*500;
+	params->dem_time_drop = params->sph_time_damping*2.0;
+
 	params->time = 0;
 	params->sph_maxh = params->sph_hfac*psep;
 
