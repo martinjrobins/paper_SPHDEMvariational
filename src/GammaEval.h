@@ -38,9 +38,11 @@ public:
 	double get_gamma_h(const double h, const double r);
 	double get_gamma_r(const double h, const double r);
 private:
+	double interpolate(Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> &data, const double h, const double r);
+
 	const double d;
-	const double h_min,h_max,r_min,r_max;
-	Eigen::Matrix<double, Dynamic, Dynamic> gamma,gamma_h,gamma_r;
+	const double h_min,h_max,r_min,r_max,n_h,n_r;
+	Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> gamma,gamma_h,gamma_r;
 
 };
 

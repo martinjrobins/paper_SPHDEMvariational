@@ -29,6 +29,7 @@
 using namespace Aboria;
 
 #include "sph_common.h"
+#include "GammaEval.h"
 #include <tuple>
 
 
@@ -180,7 +181,8 @@ void integrate_dem(const double dt,ptr<DemType> dem,
 template<typename SphGeometryType,typename DemGeometryType>
 void sphdem(ptr<SphType> sph,ptr<DemType> dem,
 		ptr<Params> params,
-		SphGeometryType sph_geometry,DemGeometryType dem_geometry) {
+		SphGeometryType sph_geometry,DemGeometryType dem_geometry,
+		GammaEval &gamma) {
 
 	const double dt = params->sph_dt;
 	const double sph_mass = params->sph_mass;
