@@ -157,6 +157,13 @@ int main(int argc, char **argv) {
 	});
 
 	/*
+	 * setup gamma calculation
+	 */
+	ptr<GammaEval> gamma = ptr<GammaEval>(new GammaEval(params->dem_diameter));
+	gamma->reset_limits(params->sph_maxh*0.5,params->sph_maxh*1.5,0,2*params->sph_maxh+params->dem_diameter/2.0,100,100);
+
+
+	/*
 	 * setup output stuff
 	 */
 	auto sph_grid = vtkSmartPointer<vtkUnstructuredGrid>::New();
@@ -199,7 +206,7 @@ int main(int argc, char **argv) {
 	std::cout << "starting...."<<std::endl;
 	for (int i = 0; i < nout; ++i) {
 		for (int k = 0; k < timesteps_per_out; ++k) {
-			sphdem(sph,dem,params,sph_geometry,dem_geometry);
+			sphdem(sph,dem,params,sph_geometry,dem_geometry,gamma);
 		}
 		std::cout <<"iteration "<<i<<std::endl;
 		

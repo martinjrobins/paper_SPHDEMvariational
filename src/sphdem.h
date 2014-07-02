@@ -182,7 +182,7 @@ template<typename SphGeometryType,typename DemGeometryType>
 void sphdem(ptr<SphType> sph,ptr<DemType> dem,
 		ptr<Params> params,
 		SphGeometryType sph_geometry,DemGeometryType dem_geometry,
-		GammaEval &gamma) {
+		ptr<GammaEval> gamma) {
 
 	const double dt = params->sph_dt;
 	const double sph_mass = params->sph_mass;
@@ -216,7 +216,7 @@ void sphdem(ptr<SphType> sph,ptr<DemType> dem,
 	 * Calculate omega and kappa and porosity
 	 */
 	//std::cout << "calculate omega"<<std::endl;
-	std::for_each(sph->begin(),sph->end(),[sph,dem,sph_mass,dem_vol](SphType::Value& i) {
+	std::for_each(sph->begin(),sph->end(),[gamma,sph,dem,sph_mass,dem_vol](SphType::Value& i) {
 		REGISTER_SPH_PARTICLE(i);
 		double alpha = -(0+NDIM*W(0,h));
 		for (auto tpl: i.get_neighbours(sph)) {
@@ -230,6 +230,8 @@ void sphdem(ptr<SphType> sph,ptr<DemType> dem,
 		}
 		double beta = 0;
 		e = 1;
+		double beta_s = 0;
+		double e_s = 1;
 		//bool found = false;
 		for (auto tpl: i.get_neighbours(dem)) {
 			REGISTER_NEIGHBOUR_DEM_PARTICLE(tpl);
@@ -238,24 +240,29 @@ void sphdem(ptr<SphType> sph,ptr<DemType> dem,
 			const double r = sqrt(r2);
 			const double q = r/h;
 			const double Wab = W(q,h);
+			//small dem:
 			if (r2 == 0) {
-				beta -= (0+NDIM*Wab);
-				e -= dem_vol*Wab;
+				beta_s -= (0+NDIM*Wab);
+				e_s -= dem_vol*Wab;
 			} else {
-				beta -= (r2*F(q,h)+NDIM*Wab);
-				e -= dem_vol*Wab;
+				beta_s -= (r2*F(q,h)+NDIM*Wab);
+				e_s -= dem_vol*Wab;
 			}
+			//big dem:
+			beta += gamma->get_gamma_h(h,r);
+			e -= gamma->get_gamma(h,r);
 			//found = true;
 		}
 		alpha *= sph_mass/h;
-		beta *= dem_vol/h;
+		//small dem:
+		beta_s *= dem_vol/h;
 
 		const double invDe = 1.0/(NDIM*e);
 		const double betaf = beta*h*invDe;
 		const double alphaf = h*alpha*invDe;
 		kappa = (rho + alphaf)/(1.0-betaf);
 		omega = 1.0/(e + (h/(NDIM*rho))*(alpha + beta*kappa));
-		//if (found) std::cout << "dem_vol = "<<dem_vol<<" e = "<<e<<" omega = "<<omega<<" rho = "<<rho<<" kappa = "<<kappa<<" alpha = "<<alpha<<" beta = "<<beta<<std::endl;
+		//if (found) std::cout << "dem_vol = "<<dem_vol<<" e = "<<e<<" omega = "<<omega<<" rho = "<<rho<<" kappa = "<<kappa<<" alpha = "<<alpha<<" beta = "<<beta<<" beta_s = "<<beta_s<<" e_s = "<<e_s<<std::endl;
 	});
 
 	/*
@@ -263,7 +270,7 @@ void sphdem(ptr<SphType> sph,ptr<DemType> dem,
 	 */
 	//std::cout << "calculate change in density"<<std::endl;
 
-	std::for_each(sph->begin(),sph->end(),[sph,dem,&sph_geometry,sph_mass,dem_vol](SphType::Value& i) {
+	std::for_each(sph->begin(),sph->end(),[gamma,sph,dem,&sph_geometry,sph_mass,dem_vol](SphType::Value& i) {
 		REGISTER_SPH_PARTICLE(i);
 
 		dddt = 0;
@@ -283,7 +290,10 @@ void sphdem(ptr<SphType> sph,ptr<DemType> dem,
 			if (r2 > 4.0*h*h) continue;
 			if (r2 == 0) continue;
 			const double r = sqrt(r2);
-			dddt_dem += dem_vol*(v-vj).dot(dx*F(r/h,h));
+//			//small dem:
+//			dddt_dem += dem_vol*(v-vj).dot(dx*F(r/h,h));
+			//big dem:
+			dddt_dem += gamma->get_gamma_r(h,r)*dx.dot(v-vj)/r;
 		}
 		dddt = omega*(dddt+kappa*dddt_dem);
 	});

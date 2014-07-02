@@ -23,15 +23,17 @@
  */
 
 #include "GammaEval.h"
+const double PI = 3.14159265359;
+
 #include "sph_common.h"
 #include "gauss_2d_sphere.h"
-
+#include <iostream>
 
 double f(double x, double y, void* data) {
-	const double r = sqrt(x*x+y*y);
-	const double h = (double)data[0];
-	const double q = r/h;
-	return W(r/h,r);
+	const double r = std::sqrt(x*x+y*y);
+	const double h = ((double *)data)[0];
+	//std::cout <<" running function f with x = "<<x<<" y = "<<y<<" h = "<<h<<" r = "<<r<<" result = "<<W(r/h,h)<<std::endl;
+	return PI*W(r/h,h)*std::abs(y);
 }
 
 
@@ -40,15 +42,16 @@ void GammaEval::reset_limits(const double _h_min, const double _h_max,
 		const double _r_min, const double _r_max,
 		const double _n_h,const double _n_r) {
 
-	const double dh = (h_max-h_min)/n_h;
-	const double dr = (r_max-r_min)/n_r;
-
 	h_min = _h_min;
 	h_max = _h_max;
 	r_min = _r_min;
 	r_max = _r_max;
 	n_h = _n_h;
 	n_r = _n_r;
+
+	const double dh = (h_max-h_min)/n_h;
+	const double dr = (r_max-r_min)/n_r;
+	//std::cout <<" dr = "<<dr<<" rmin = "<<r_min<<" rmax = "<<r_max<<std::endl;
 
 	gamma.resize(n_h+3,n_r+3);
 	gamma_h.resize(n_h+3,n_r+3);
@@ -57,15 +60,16 @@ void GammaEval::reset_limits(const double _h_min, const double _h_max,
 	for (int i = 0; i <= n_h+2; ++i) {
 		const double h = h_min + dh*(i-1);
 		for (int j = 0; j <= n_r+2; ++j) {
-			const double r = r_min + dr*(j-1);
+			const double r = std::abs(r_min + dr*(j-1));
 			gamma(i,j) = gauss_product_2D_sphere(25,f,(void *)&h,d/2.0,r,0.0);
+			//;std::cout <<" gamma(i,j) = "<<gamma(i,j)/((4.0/3.0)*PI*pow(d/2.0,3))<<" i = "<<i<<" j = "<<j<<" r = "<<r<<" h = "<<h<<std::endl;
 		}
 	}
 
 	for (int i = 0; i <= n_h+2; ++i) {
 		const double h = h_min + dh*(i-1);
 		for (int j = 0; j <= n_r+2; ++j) {
-			const double r = r_min + dr*(j-1);
+			const double r = abs(r_min + dr*(j-1));
 			if (i < 2) {
 				gamma_h(i,j) = -(25.0/12.0)*gamma(i,j) + (4.0)*gamma(i+1,j) - (3.0)*gamma(i+2,j) + (4.0/3.0)*gamma(i+3,j) - (1.0/4.0)*gamma(i+4,j);
 			} else if (i < 1) {
@@ -89,6 +93,9 @@ void GammaEval::reset_limits(const double _h_min, const double _h_max,
 			} else {
 				gamma_r(i,j) = (1.0/12.0)*gamma(i,j-2) - (2.0/3.0)*gamma(i,j-1) + (2.0/3.0)*gamma(i,j+1) - (1.0/12.0)*gamma(i,j+2);
 			}
+
+			gamma_h(i,j) /= dh;
+			gamma_r(i,j) /= dr;
 		}
 	}
 
@@ -113,6 +120,10 @@ double bicubicInterpolate (double p[4][4], const double x, const double y) {
 
 #define LINEAR
 double GammaEval::interpolate(Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> &data, const double h, const double r) {
+	if ((h < h_min)||(h >= h_max)||(r < r_min)||(r >= r_max)) {
+		std::cerr << "evaluating gamma outside limits at h = "<<h<<" and r = "<<r<<std::endl;
+		exit(-1);
+	}
 	const double dh = (h_max-h_min)/n_h;
 	const double dr = (r_max-r_min)/n_r;
 	const int i0 = (int)floor((h-h_min)/dh);
@@ -130,11 +141,14 @@ double GammaEval::interpolate(Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynam
 	return  bicubicInterpolate(p,x,y);
 #else
 	double p[2][2];
+	//std::cout<<" data is: ";
 	for (int i = 0; i < 2; ++i) {
 		for (int j = 0; j < 2; ++j) {
 			p[i][j] = data(i0+i,j0+j);
+			//std::cout <<" "<<p[i][j];
 		}
 	}
+	//std::cout << " evaling at x,y = "<<x<<","<<y<<std::endl;
 	return  bilinearInterpolate(p,x,y);
 #endif
 }

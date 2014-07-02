@@ -29,10 +29,9 @@
 
 class GammaEval {
 public:
-	GammaEval(const double d):d(d),h_min(0),h_max(-1),r_min(0),r_max(-1) {
+	GammaEval(const double d):d(d),h_min(0),h_max(-1),r_min(0),r_max(-1),n_h(0),n_r(0) {
 
 	}
-	virtual ~GammaEval();
 	void reset_limits(const double h_min,const double h_max,const double r_min,const double r_max,const double n_h,const double n_r);
 	double get_gamma(const double h, const double r);
 	double get_gamma_h(const double h, const double r);
@@ -41,7 +40,7 @@ private:
 	double interpolate(Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> &data, const double h, const double r);
 
 	const double d;
-	const double h_min,h_max,r_min,r_max,n_h,n_r;
+	double h_min,h_max,r_min,r_max,n_h,n_r;
 	Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> gamma,gamma_h,gamma_r;
 
 };

@@ -42,7 +42,7 @@ int main(int argc, char **argv) {
 
 	 /* dem parameters
 	 */
-	params->dem_diameter = 0.0001;
+	params->dem_diameter = 0.0012;
 	params->dem_gamma = 0.0;
 	params->dem_k = 10;
 	params->dem_vol = (1.0/6.0)*PI*pow(params->dem_diameter,3);
@@ -147,6 +147,12 @@ int main(int argc, char **argv) {
 		return Vect3d(L/2,L/2,0.75*L);
 	});
 
+	/*
+	 * setup gamma calculation
+	 */
+	ptr<GammaEval> gamma = ptr<GammaEval>(new GammaEval(params->dem_diameter));
+	gamma->reset_limits(params->sph_maxh*0.5,params->sph_maxh*1.5,0.0,2.0*params->sph_maxh+params->dem_diameter/2.0,100,100);
+
 
 	/*
 	 * setup output stuff
@@ -166,7 +172,7 @@ int main(int argc, char **argv) {
 	for (int i = 0; i < nout; ++i) {
 		for (int k = 0; k < timesteps_per_out; ++k) {
 			//std::this_thread::sleep_for(std::chrono::seconds(1));
-			sphdem(sph,dem,params,sph_geometry,dem_geometry);
+			sphdem(sph,dem,params,sph_geometry,dem_geometry,gamma);
 		}
 		std::cout <<"iteration "<<i<<std::endl;
 		
