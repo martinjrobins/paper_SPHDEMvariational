@@ -394,13 +394,19 @@ void sphdem(ptr<SphType> sph,ptr<DemType> dem,
 			/*
 			 * drag term
 			 */
-			if (dv_mod2 > 0) {
-				const double dv_mod = sqrt(dv_mod2);
-				const double Rep = dem_diameter*e*dv_mod/sph_visc;
-				const double Cd = 24.0/Rep;
-				const double beta_times_vol = (1.0/8.0)*Cd*PI*rho*pow(dem_diameter,2)*dv_mod;
-				fdrag -= beta_times_vol*dv*Wab;
-			}
+//			if (dv_mod2 > 0) {
+//				const double dv_mod = sqrt(dv_mod2);
+//				const double Rep = dem_diameter*e*dv_mod/sph_visc;
+//				const double Cd = 24.0/Rep;
+//				const double beta_times_vol = (1.0/8.0)*Cd*PI*rho*pow(dem_diameter,2)*dv_mod;
+//				fdrag -= beta_times_vol*dv*Wab;
+//			}
+
+
+			/*
+			 * viscosity
+			 */
+			fdrag += (v-vj)*(sph_visc + sph_visc)*gamma->get_phi(h,r);
 
 			/*
 			 * dem pressure term
@@ -410,12 +416,11 @@ void sphdem(ptr<SphType> sph,ptr<DemType> dem,
 			found = true;
 
 		}
-		if (e > 0) {
-			fdrag /= (rho*e);
-		} else {
-			fdrag << 0,0,0;
-		}
-		fdrag << 0,0,0;
+//		if (e > 0) {
+//			fdrag /= (rho*e);
+//		} else {
+//			fdrag << 0,0,0;
+//		}
 		f0 = pdr2*omega*kappa*fdem;
 		//if (found) std::cout <<"fdem = "<<fdem<<"f0 = "<<f0<<std::endl;
 

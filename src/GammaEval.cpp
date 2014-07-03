@@ -36,6 +36,13 @@ double f(double x, double y, void* data) {
 	return PI*W(r/h,h)*std::abs(y);
 }
 
+double f2(double x, double y, void* data) {
+	const double r = std::sqrt(x*x+y*y);
+	const double h = ((double *)data)[0];
+	//std::cout <<" running function f with x = "<<x<<" y = "<<y<<" h = "<<h<<" r = "<<r<<" result = "<<W(r/h,h)<<std::endl;
+	return PI*F(r/h,h)*std::abs(y);
+}
+
 
 
 void GammaEval::reset_limits(const double _h_min, const double _h_max,
@@ -54,6 +61,8 @@ void GammaEval::reset_limits(const double _h_min, const double _h_max,
 	//std::cout <<" dr = "<<dr<<" rmin = "<<r_min<<" rmax = "<<r_max<<std::endl;
 
 	gamma.resize(n_h+3,n_r+3);
+	phi.resize(n_h+3,n_r+3);
+
 	gamma_h.resize(n_h+3,n_r+3);
 	gamma_r.resize(n_h+3,n_r+3);
 
@@ -62,6 +71,7 @@ void GammaEval::reset_limits(const double _h_min, const double _h_max,
 		for (int j = 0; j <= n_r+2; ++j) {
 			const double r = std::abs(r_min + dr*(j-1));
 			gamma(i,j) = gauss_product_2D_sphere(128,f,(void *)&h,d/2.0,r,0.0);
+			phi(i,j) = gauss_product_2D_sphere(128,f2,(void *)&h,d/2.0,r,0.0);
 			//;std::cout <<" gamma(i,j) = "<<gamma(i,j)/((4.0/3.0)*PI*pow(d/2.0,3))<<" i = "<<i<<" j = "<<j<<" r = "<<r<<" h = "<<h<<std::endl;
 		}
 	}
@@ -155,6 +165,10 @@ double GammaEval::interpolate(Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynam
 
 double GammaEval::get_gamma(const double h, const double r) {
 	return interpolate(gamma,h,r);
+}
+
+double GammaEval::get_phi(const double h, const double r) {
+	return interpolate(phi,h,r);
 }
 
 double GammaEval::get_gamma_h(const double h, const double r) {

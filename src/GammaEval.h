@@ -34,6 +34,7 @@ public:
 	}
 	void reset_limits(const double h_min,const double h_max,const double r_min,const double r_max,const double n_h,const double n_r);
 	double get_gamma(const double h, const double r);
+	double get_phi(const double h, const double r);
 	double get_gamma_h(const double h, const double r);
 	double get_gamma_r(const double h, const double r);
 private:
@@ -41,7 +42,7 @@ private:
 
 	const double d;
 	double h_min,h_max,r_min,r_max,n_h,n_r;
-	Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> gamma,gamma_h,gamma_r;
+	Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> gamma,gamma_h,gamma_r,phi;
 
 };
 
