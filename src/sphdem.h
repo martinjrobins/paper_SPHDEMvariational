@@ -201,6 +201,7 @@ void sphdem(ptr<SphType> sph,ptr<DemType> dem,
 	 * 0 -> 1/2 step
 	 */
 	//std::cout << "0 -> 1/2 step"<<std::endl;
+	sph->reset_neighbour_search(2.0*sph_maxh);
 	dem->reset_neighbour_search(dem_diameter);
 	integrate_dem(dt/2,dem,params,dem_geometry); //update dem positions
 	dem->reset_neighbour_search(2.0*sph_maxh+dem_diameter/2.0);
@@ -216,7 +217,7 @@ void sphdem(ptr<SphType> sph,ptr<DemType> dem,
 	 * Calculate omega and kappa and porosity
 	 */
 	//std::cout << "calculate omega"<<std::endl;
-	std::for_each(sph->begin(),sph->end(),[gamma,sph,dem,sph_mass,dem_vol](SphType::Value& i) {
+	std::for_each(sph->begin(),sph->end(),[gamma,sph,dem,sph_mass,dem_vol,dem_diameter](SphType::Value& i) {
 		REGISTER_SPH_PARTICLE(i);
 		double alpha = -(0+NDIM*W(0,h));
 		for (auto tpl: i.get_neighbours(sph)) {
@@ -236,7 +237,7 @@ void sphdem(ptr<SphType> sph,ptr<DemType> dem,
 		for (auto tpl: i.get_neighbours(dem)) {
 			REGISTER_NEIGHBOUR_DEM_PARTICLE(tpl);
 			const double r2 = dx.squaredNorm();
-			if (r2 > 4.0*h*h) continue;
+			if (r2 > pow(2*h + dem_diameter/2.0,2)) continue;
 			const double r = sqrt(r2);
 			const double q = r/h;
 			const double Wab = W(q,h);
@@ -270,7 +271,7 @@ void sphdem(ptr<SphType> sph,ptr<DemType> dem,
 	 */
 	//std::cout << "calculate change in density"<<std::endl;
 
-	std::for_each(sph->begin(),sph->end(),[gamma,sph,dem,&sph_geometry,sph_mass,dem_vol](SphType::Value& i) {
+	std::for_each(sph->begin(),sph->end(),[gamma,sph,dem,&sph_geometry,sph_mass,dem_vol,dem_diameter](SphType::Value& i) {
 		REGISTER_SPH_PARTICLE(i);
 
 		dddt = 0;
@@ -288,7 +289,7 @@ void sphdem(ptr<SphType> sph,ptr<DemType> dem,
 		for (auto tpl: i.get_neighbours(dem)) {
 			REGISTER_NEIGHBOUR_DEM_PARTICLE(tpl);
 			const double r2 = dx.squaredNorm();
-			if (r2 > 4.0*h*h) continue;
+			if (r2 > pow(2*h + dem_diameter/2.0,2)) continue;
 			if (r2 == 0) continue;
 			const double r = sqrt(r2);
 //			//small dem:
@@ -382,7 +383,7 @@ void sphdem(ptr<SphType> sph,ptr<DemType> dem,
 		for (auto tpl: i.get_neighbours(dem)) {
 			REGISTER_NEIGHBOUR_DEM_PARTICLE(tpl);
 			const double r2 = dx.squaredNorm();
-			if (r2 > 4.0*h*h) continue;
+			if (r2 > pow(2*h + dem_diameter/2.0,2)) continue;
 			const double r = sqrt(r2);
 			const double q = r/h;
 			const Vect3d dv = (v-vj);
@@ -431,6 +432,7 @@ void sphdem(ptr<SphType> sph,ptr<DemType> dem,
 	 *  Calculate coupling and drag force on DEM
 	 */
 	//std::cout << "calculate coupling force on DEM"<<std::endl;
+	sph->reset_neighbour_search(2.0*sph_maxh+dem_diameter/2.0);
 	std::for_each(dem->begin(),dem->end(),[sph,dem_vol,sph_mass,sph_visc,dem_diameter,sph_dens,dem_mass](DemType::Value& i) {
 		REGISTER_DEM_PARTICLE(i);
 
@@ -440,7 +442,7 @@ void sphdem(ptr<SphType> sph,ptr<DemType> dem,
 		for (auto tpl: i.get_neighbours(sph)) {
 			REGISTER_NEIGHBOUR_SPH_PARTICLE(tpl);
 			const double r2 = dx.squaredNorm();
-			if (r2 > 4.0*hj*hj) continue;
+			if (r2 > pow(2*hj + dem_diameter/2.0,2)) continue;
 			const double r = sqrt(r2);
 			const double q = r/hj;
 			const Vect3d dv = (v-vj);
@@ -468,22 +470,23 @@ void sphdem(ptr<SphType> sph,ptr<DemType> dem,
 			/*
 			 * pressure gradient from fluid
 			 */
-//			if (r > 0) {
-//				const double fdashj = F(q,hj);
-//				f0 -= sph_mass*omegaj*pdr2j*kappaj*fdashj*dx;
-//
-//			}
-			f0 += fj*Wdv;
+			if (r > 0) {
+				const double fdashj = F(q,hj);
+				f0 -= sph_mass*omegaj*pdr2j*kappaj*fdashj*dx;
+
+			}
+			//f0 += fj*Wdv;
 		}
 
 		fdrag /= dem_mass;
 		fdrag << 0,0,0;
-		if (s > 0.5) {
-			f0 *= sph_dens/s;
-			f0 *= (dem_vol/dem_mass);
-		} else {
-			f0 << 0,0,0;
-		}
+//		if (s > 0.5) {
+//			f0 *= sph_dens/s;
+//			f0 *= (dem_vol/dem_mass);
+//		} else {
+//			f0 << 0,0,0;
+//		}
+		f0 *= dem_vol;
 		//std::cout <<"f0 = "<<f0<<" omega = "<<omegad<<" kappa = "<<kappad<<std::endl;
 
 	});

@@ -73,7 +73,7 @@ int main(int argc, char **argv) {
 	std::cout << "sph_dt = "<<params->sph_dt<<" 1/20 m/b = "<<(1.0/20.0)*params->dem_mass/(3.0*PI*params->sph_dens*params->sph_visc*params->dem_diameter)<<std::endl;
 	std::cout << "dem_dt = "<<params->dem_dt<<std::endl;
 
-	params->dem_time_drop = params->sph_dt*timesteps/8.0;
+	params->dem_time_drop = params->sph_dt*timesteps/4.0;
 	params->time = 0;
 	params->sph_maxh = params->sph_hfac*psep;
 
@@ -112,41 +112,13 @@ int main(int argc, char **argv) {
 	const Vect3d max_domain(L,L,L*2);
 	const Vect3b periodic(true,true,false);
 
-	/*
-	 * create sph and dem particles
-	 */
-	sph->create_particles_grid(min,max,Vect3i(nx,nx,nx+3),[psep,params](SphType::Value& i) {
-		REGISTER_SPH_PARTICLE(i);
-		h = params->sph_maxh;
-		omega = 1.0;
-		kappa = 0.0;
-		v << 0,0,0;
-		v0 << 0,0,0;
-		dddt = 0;
-		e = 1;
-		rho = params->sph_dens;
-		f << 0,0,0;
-		fdrag << 0,0,0;
-		f0 << 0,0,0;
-		if ((r[1]<2) || (r[1]>nx-2)){
-			fixed = true;
-		} else {
-			fixed = false;
-		}
-		if (r[2]<0) {
-			fixed = true;
-		} else {
-			fixed = false;
-		}
-	});
-
 	dem->create_particles(1,[L](DemType::Value& i) {
 		REGISTER_DEM_PARTICLE(i);
 		v << 0,0,0;
 		v0 << 0,0,0;
 		f << 0,0,0;
 		f0 << 0,0,0;
-		return Vect3d(L/2,L/2,1.5*L);
+		return Vect3d(L/2,L/2,0.75*L);
 	});
 
 	/*
@@ -173,6 +145,42 @@ int main(int argc, char **argv) {
 	dem->init_neighbour_search(min,max_domain,2*params->sph_maxh + params->dem_diameter/2.0,periodic);
 
 	/*
+	 * create sph and dem particles
+	 */
+	sph->create_particles_grid(min,max,Vect3i(nx,nx,nx+3),[dem,psep,params](SphType::Value& i) {
+		REGISTER_SPH_PARTICLE(i);
+		h = params->sph_maxh;
+		omega = 1.0;
+		kappa = 0.0;
+		v << 0,0,0;
+		v0 << 0,0,0;
+		dddt = 0;
+		e = 1;
+		rho = params->sph_dens;
+		f << 0,0,0;
+		fdrag << 0,0,0;
+		f0 << 0,0,0;
+		if ((r[1]<2) || (r[1]>nx-2)){
+			fixed = true;
+		} else {
+			fixed = false;
+		}
+		if (r[2]<0) {
+			fixed = true;
+		} else {
+			fixed = false;
+		}
+	
+		for (auto tpl: i.get_neighbours(dem)) {
+			REGISTER_NEIGHBOUR_DEM_PARTICLE(tpl);
+			const double r2 = dx.squaredNorm();
+			if (r2 < 4.0*pow(2*h+params->dem_diameter/2.0,2)) i.mark_for_deletion();
+		}
+	});
+	sph->delete_particles();
+
+
+	/*
 	 * init porosity and rho
 	 */
 	//std::cout << "calculate omega"<<std::endl;
@@ -183,7 +191,7 @@ int main(int argc, char **argv) {
 		for (auto tpl: i.get_neighbours(dem)) {
 			REGISTER_NEIGHBOUR_DEM_PARTICLE(tpl);
 			const double r2 = dx.squaredNorm();
-			if (r2 > 4.0*h*h) continue;
+			if (r2 > pow(2*h + params->dem_diameter/2.0,2)) continue;
 			const double r = sqrt(r2);
 			e -= gamma->get_gamma(h,r);
 
