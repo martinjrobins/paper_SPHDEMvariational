@@ -182,7 +182,7 @@ int main(int argc, char **argv) {
 	 * init porosity and rho
 	 */
 	//std::cout << "calculate omega"<<std::endl;
-	std::for_each(sph->begin(),sph->end(),[sph,dem,params](SphType::Value& i) {
+	std::for_each(sph->begin(),sph->end(),[gamma,sph,dem,params](SphType::Value& i) {
 		REGISTER_SPH_PARTICLE(i);
 		e = 1;
 		//bool found = false;
@@ -191,9 +191,8 @@ int main(int argc, char **argv) {
 			const double r2 = dx.squaredNorm();
 			if (r2 > 4.0*h*h) continue;
 			const double r = sqrt(r2);
-			const double q = r/h;
-			const double Wab = W(q,h);
-			e -= params->dem_vol*Wab;
+			e -= gamma->get_gamma(h,r);
+
 			//found = true;
 		}
 		rho = params->sph_dens/e;

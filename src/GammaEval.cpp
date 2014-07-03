@@ -61,7 +61,7 @@ void GammaEval::reset_limits(const double _h_min, const double _h_max,
 		const double h = h_min + dh*(i-1);
 		for (int j = 0; j <= n_r+2; ++j) {
 			const double r = std::abs(r_min + dr*(j-1));
-			gamma(i,j) = gauss_product_2D_sphere(25,f,(void *)&h,d/2.0,r,0.0);
+			gamma(i,j) = gauss_product_2D_sphere(128,f,(void *)&h,d/2.0,r,0.0);
 			//;std::cout <<" gamma(i,j) = "<<gamma(i,j)/((4.0/3.0)*PI*pow(d/2.0,3))<<" i = "<<i<<" j = "<<j<<" r = "<<r<<" h = "<<h<<std::endl;
 		}
 	}

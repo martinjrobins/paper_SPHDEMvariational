@@ -69,10 +69,11 @@ int main(int argc, char **argv) {
 	params->sph_dt = std::min(0.25*params->sph_hfac*psep/params->sph_spsound,0.125*pow(params->sph_hfac*psep,2)/params->sph_visc);
 	params->sph_mass = params->sph_dens*pow(psep,NDIM);
 
-	std::cout << "h = "<<params->sph_hfac*psep<<" vmax = "<<VMAX<<std::endl;
+	std::cout << "h = "<<params->sph_hfac*psep<<" vmax = "<<VMAX<<" psep = "<<psep<<std::endl;
 	std::cout << "sph_dt = "<<params->sph_dt<<" 1/20 m/b = "<<(1.0/20.0)*params->dem_mass/(3.0*PI*params->sph_dens*params->sph_visc*params->dem_diameter)<<std::endl;
+	std::cout << "dem_dt = "<<params->dem_dt<<std::endl;
 
-	params->dem_time_drop = params->sph_dt*timesteps/4.0;
+	params->dem_time_drop = params->sph_dt*timesteps/8.0;
 	params->time = 0;
 	params->sph_maxh = params->sph_hfac*psep;
 
@@ -108,6 +109,7 @@ int main(int argc, char **argv) {
 
 	const Vect3d min(0,0,-3.0*psep);
 	const Vect3d max(L,L,L);
+	const Vect3d max_domain(L,L,L*2);
 	const Vect3b periodic(true,true,false);
 
 	/*
@@ -144,7 +146,7 @@ int main(int argc, char **argv) {
 		v0 << 0,0,0;
 		f << 0,0,0;
 		f0 << 0,0,0;
-		return Vect3d(L/2,L/2,0.75*L);
+		return Vect3d(L/2,L/2,1.5*L);
 	});
 
 	/*
@@ -152,6 +154,7 @@ int main(int argc, char **argv) {
 	 */
 	ptr<GammaEval> gamma = ptr<GammaEval>(new GammaEval(params->dem_diameter));
 	gamma->reset_limits(params->sph_maxh*0.5,params->sph_maxh*1.5,0.0,2.0*params->sph_maxh+params->dem_diameter/2.0,100,100);
+
 
 
 	/*
@@ -166,8 +169,28 @@ int main(int argc, char **argv) {
 
 
 	std::cout << "starting...."<<std::endl;
-	sph->init_neighbour_search(min,max,2*params->sph_maxh,periodic);
-	dem->init_neighbour_search(min,max,params->dem_diameter,periodic);
+	sph->init_neighbour_search(min,max_domain,2*params->sph_maxh,periodic);
+	dem->init_neighbour_search(min,max_domain,2*params->sph_maxh + params->dem_diameter/2.0,periodic);
+
+	/*
+	 * init porosity and rho
+	 */
+	//std::cout << "calculate omega"<<std::endl;
+	std::for_each(sph->begin(),sph->end(),[gamma,sph,dem,params](SphType::Value& i) {
+		REGISTER_SPH_PARTICLE(i);
+		e = 1;
+		//bool found = false;
+		for (auto tpl: i.get_neighbours(dem)) {
+			REGISTER_NEIGHBOUR_DEM_PARTICLE(tpl);
+			const double r2 = dx.squaredNorm();
+			if (r2 > 4.0*h*h) continue;
+			const double r = sqrt(r2);
+			e -= gamma->get_gamma(h,r);
+
+			//found = true;
+		}
+		rho = params->sph_dens/e;
+	});
 
 	for (int i = 0; i < nout; ++i) {
 		for (int k = 0; k < timesteps_per_out; ++k) {

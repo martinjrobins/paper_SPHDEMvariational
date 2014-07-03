@@ -203,7 +203,7 @@ void sphdem(ptr<SphType> sph,ptr<DemType> dem,
 	//std::cout << "0 -> 1/2 step"<<std::endl;
 	dem->reset_neighbour_search(dem_diameter);
 	integrate_dem(dt/2,dem,params,dem_geometry); //update dem positions
-	dem->reset_neighbour_search(2.0*sph_maxh);
+	dem->reset_neighbour_search(2.0*sph_maxh+dem_diameter/2.0);
 
 	sph->update_positions(sph->begin(),sph->end(),[dt,sph_mass,params](SphType::Value& i) {
 		REGISTER_SPH_PARTICLE(i);
@@ -232,7 +232,7 @@ void sphdem(ptr<SphType> sph,ptr<DemType> dem,
 		e = 1;
 		double beta_s = 0;
 		double e_s = 1;
-		//bool found = false;
+		bool found = false;
 		for (auto tpl: i.get_neighbours(dem)) {
 			REGISTER_NEIGHBOUR_DEM_PARTICLE(tpl);
 			const double r2 = dx.squaredNorm();
@@ -251,7 +251,7 @@ void sphdem(ptr<SphType> sph,ptr<DemType> dem,
 			//big dem:
 			beta += gamma->get_gamma_h(h,r);
 			e -= gamma->get_gamma(h,r);
-			//found = true;
+			found = true;
 		}
 		alpha *= sph_mass/h;
 		//small dem:
@@ -284,6 +284,7 @@ void sphdem(ptr<SphType> sph,ptr<DemType> dem,
 			dddt += sph_mass*(v-vj).dot(dx*F(r/h,h));
 		}
 		double dddt_dem = 0;
+		bool found = false;
 		for (auto tpl: i.get_neighbours(dem)) {
 			REGISTER_NEIGHBOUR_DEM_PARTICLE(tpl);
 			const double r2 = dx.squaredNorm();
@@ -294,8 +295,11 @@ void sphdem(ptr<SphType> sph,ptr<DemType> dem,
 //			dddt_dem += dem_vol*(v-vj).dot(dx*F(r/h,h));
 			//big dem:
 			dddt_dem += gamma->get_gamma_r(h,r)*dx.dot(v-vj)/r;
+			found = true;
 		}
 		dddt = omega*(dddt+kappa*dddt_dem);
+		//if (found) std::cout <<" dddt_dem = "<<omega*kappa*dddt_dem<<" dddt = "<<omega*dddt<<" dens = "<<rho<<std::endl;
+
 	});
 
 
@@ -336,7 +340,7 @@ void sphdem(ptr<SphType> sph,ptr<DemType> dem,
 		pdr2 = press/pow(rho,2);
 		return r + dt/2 * v0;
 	});
-	dem->reset_neighbour_search(2.0*sph_maxh);
+	dem->reset_neighbour_search(2.0*sph_maxh+dem_diameter/2.0);
 
 
 	/*
@@ -344,7 +348,7 @@ void sphdem(ptr<SphType> sph,ptr<DemType> dem,
 	 */
 	//std::cout << "acceleration on SPH"<<std::endl;
 
-	std::for_each(sph->begin(),sph->end(),[sph,dem,&sph_geometry,sph_mass,sph_visc,dem_vol,dem_diameter](SphType::Value& i) {
+	std::for_each(sph->begin(),sph->end(),[gamma,sph,dem,&sph_geometry,sph_mass,sph_visc,dem_vol,dem_diameter](SphType::Value& i) {
 		REGISTER_SPH_PARTICLE(i);
 
 		f << 0,0,0;
@@ -374,6 +378,7 @@ void sphdem(ptr<SphType> sph,ptr<DemType> dem,
 		Vect3d fdem(0,0,0);
 		fdrag << 0,0,0;
 		e = 1;
+		bool found = false;
 		for (auto tpl: i.get_neighbours(dem)) {
 			REGISTER_NEIGHBOUR_DEM_PARTICLE(tpl);
 			const double r2 = dx.squaredNorm();
@@ -400,7 +405,9 @@ void sphdem(ptr<SphType> sph,ptr<DemType> dem,
 			/*
 			 * dem pressure term
 			 */
-			if (r>0) fdem -= dem_vol*F(q,h)*dx;
+			//if (r>0) fdem -= dem_vol*F(q,h)*dx;
+			if (r>0) fdem -= gamma->get_gamma_r(h,r)*dx/r;
+			found = true;
 
 		}
 		if (e > 0) {
@@ -408,8 +415,10 @@ void sphdem(ptr<SphType> sph,ptr<DemType> dem,
 		} else {
 			fdrag << 0,0,0;
 		}
-		//std::cout <<"fdem = "<<fdem<<std::endl;
+		fdrag << 0,0,0;
 		f0 = pdr2*omega*kappa*fdem;
+		//if (found) std::cout <<"fdem = "<<fdem<<"f0 = "<<f0<<std::endl;
+
 
 	});
 
@@ -463,6 +472,7 @@ void sphdem(ptr<SphType> sph,ptr<DemType> dem,
 		}
 
 		fdrag /= dem_mass;
+		fdrag << 0,0,0;
 		if (s > 0.5) {
 			f0 *= sph_dens/s;
 			f0 *= (dem_vol/dem_mass);
