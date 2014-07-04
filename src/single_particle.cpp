@@ -37,12 +37,12 @@ int main(int argc, char **argv) {
 	const int nout = 100;
 	const int timesteps_per_out = timesteps/nout;
 	const double L = 0.004;
-	const int nx = 10;
+	const int nx = 20;
 
 
 	 /* dem parameters
 	 */
-	params->dem_diameter = 0.0012;
+	params->dem_diameter = 0.0008;
 	params->dem_gamma = 0.0;
 	params->dem_k = 10;
 	params->dem_vol = (1.0/6.0)*PI*pow(params->dem_diameter,3);
@@ -73,7 +73,7 @@ int main(int argc, char **argv) {
 	std::cout << "sph_dt = "<<params->sph_dt<<" 1/20 m/b = "<<(1.0/20.0)*params->dem_mass/(3.0*PI*params->sph_dens*params->sph_visc*params->dem_diameter)<<std::endl;
 	std::cout << "dem_dt = "<<params->dem_dt<<std::endl;
 
-	params->dem_time_drop = params->sph_dt*timesteps/4.0;
+	params->dem_time_drop = params->sph_dt*timesteps/8.0;
 	params->time = 0;
 	params->sph_maxh = params->sph_hfac*psep;
 
@@ -118,26 +118,18 @@ int main(int argc, char **argv) {
 		v0 << 0,0,0;
 		f << 0,0,0;
 		f0 << 0,0,0;
-		return Vect3d(L/2,L/2,0.75*L);
+		return Vect3d(L/2,L/2,L);
 	});
 
 	/*
 	 * setup gamma calculation
 	 */
 	ptr<GammaEval> gamma = ptr<GammaEval>(new GammaEval(params->dem_diameter));
-	gamma->reset_limits(params->sph_maxh*0.5,params->sph_maxh*1.5,0.0,2.0*params->sph_maxh+params->dem_diameter/2.0,100,100);
+	gamma->reset_limits(params->sph_maxh*0.5,params->sph_maxh*1.5,0.0,3.0*params->sph_maxh+params->dem_diameter/2.0,100,100);
 
 
 
-	/*
-	 * setup output stuff
-	 */
-	auto sph_grid = vtkSmartPointer<vtkUnstructuredGrid>::New();
-	auto dem_grid = vtkSmartPointer<vtkUnstructuredGrid>::New();
-	sph->copy_to_vtk_grid(sph_grid);
-	dem->copy_to_vtk_grid(dem_grid);
-	Visualisation::vtkWriteGrid("vis/at_start_sph",0,sph_grid);
-	Visualisation::vtkWriteGrid("vis/at_start_dem",0,dem_grid);
+
 
 
 	std::cout << "starting...."<<std::endl;
@@ -174,7 +166,10 @@ int main(int argc, char **argv) {
 		for (auto tpl: i.get_neighbours(dem)) {
 			REGISTER_NEIGHBOUR_DEM_PARTICLE(tpl);
 			const double r2 = dx.squaredNorm();
-			if (r2 < 4.0*pow(2*h+params->dem_diameter/2.0,2)) i.mark_for_deletion();
+			if (r2 < pow(params->dem_diameter/2.0,2)) {
+				std::cout << "removing sph at r = "<<r<<" |r| = "<<sqrt(r2)<<"dist = "<<2*h+params->dem_diameter/2.0<<" dx = "<<dx<<std::endl;
+				i.mark_for_deletion();
+			}
 		}
 	});
 	sph->delete_particles();
@@ -192,13 +187,26 @@ int main(int argc, char **argv) {
 			REGISTER_NEIGHBOUR_DEM_PARTICLE(tpl);
 			const double r2 = dx.squaredNorm();
 			if (r2 > pow(2*h + params->dem_diameter/2.0,2)) continue;
-			const double r = sqrt(r2);
-			e -= gamma->get_gamma(h,r);
+			const double absr = sqrt(r2);
+			e -= gamma->get_gamma(h,absr);
+			//std::cout <<" particle at r = "<<r<<" absr = "<<absr<<" dx = "<<dx<<" e = "<<e<<std::endl;
 
 			//found = true;
 		}
-		rho = params->sph_dens/e;
+		//h = pow(params->sph_mass/(e*rho),1.0/NDIM);
+
+		//rho = params->sph_dens/e;
 	});
+
+	/*
+	 * setup output stuff
+	 */
+	auto sph_grid = vtkSmartPointer<vtkUnstructuredGrid>::New();
+	auto dem_grid = vtkSmartPointer<vtkUnstructuredGrid>::New();
+	sph->copy_to_vtk_grid(sph_grid);
+	dem->copy_to_vtk_grid(dem_grid);
+	Visualisation::vtkWriteGrid("vis/at_start_sph",0,sph_grid);
+	Visualisation::vtkWriteGrid("vis/at_start_dem",0,dem_grid);
 
 	for (int i = 0; i < nout; ++i) {
 		for (int k = 0; k < timesteps_per_out; ++k) {

@@ -261,7 +261,8 @@ void sphdem(ptr<SphType> sph,ptr<DemType> dem,
 		const double invDe = 1.0/(NDIM*e);
 		const double betaf = beta*h*invDe;
 		const double alphaf = h*alpha*invDe;
-		kappa = (rho + alphaf)/(1.0-betaf);
+		//kappa = (rho + alphaf)/(1.0-betaf);
+		kappa = rho;
 		omega = 1.0/(e + (h/(NDIM*rho))*(alpha + beta*kappa));
 		//if (found) std::cout << "dem_vol = "<<dem_vol<<" e = "<<e<<" omega = "<<omega<<" rho = "<<rho<<" kappa = "<<kappa<<" alpha = "<<alpha<<" beta = "<<beta<<" beta_s = "<<beta_s<<" e_s = "<<e_s<<std::endl;
 	});
@@ -315,7 +316,8 @@ void sphdem(ptr<SphType> sph,ptr<DemType> dem,
 	std::for_each(sph->begin(),sph->end(),[dt,sph_mass](SphType::Value& i) {
 		REGISTER_SPH_PARTICLE(i);
 		rho += dt * dddt;
-		h = pow(sph_mass/(e*rho),1.0/NDIM);
+		//h = pow(sph_mass/(e*rho),1.0/NDIM);
+		h = pow(sph_mass/(rho),1.0/NDIM);
 	});
 	auto iterator_to_maxh =
 	    std::max_element(sph->begin(),sph->end(),[](SphType::Value& i, SphType::Value& j){
@@ -378,7 +380,7 @@ void sphdem(ptr<SphType> sph,ptr<DemType> dem,
 
 		Vect3d fdem(0,0,0);
 		fdrag << 0,0,0;
-		e = 1;
+		//e = 1;
 		bool found = false;
 		for (auto tpl: i.get_neighbours(dem)) {
 			REGISTER_NEIGHBOUR_DEM_PARTICLE(tpl);
@@ -389,7 +391,8 @@ void sphdem(ptr<SphType> sph,ptr<DemType> dem,
 			const Vect3d dv = (v-vj);
 			const double dv_mod2 = dv.squaredNorm();
 			const double Wab = W(q,h);
-			e -= dem_vol*Wab;
+			//e -= dem_vol*Wab;
+			//e -= gamma->get_gamma(h,r);
 
 
 			/*
@@ -433,7 +436,7 @@ void sphdem(ptr<SphType> sph,ptr<DemType> dem,
 	 */
 	//std::cout << "calculate coupling force on DEM"<<std::endl;
 	sph->reset_neighbour_search(2.0*sph_maxh+dem_diameter/2.0);
-	std::for_each(dem->begin(),dem->end(),[sph,dem_vol,sph_mass,sph_visc,dem_diameter,sph_dens,dem_mass](DemType::Value& i) {
+	std::for_each(dem->begin(),dem->end(),[gamma,sph,dem_vol,sph_mass,sph_visc,dem_diameter,sph_dens,dem_mass](DemType::Value& i) {
 		REGISTER_DEM_PARTICLE(i);
 
 		f0 << 0,0,0;
@@ -452,27 +455,33 @@ void sphdem(ptr<SphType> sph,ptr<DemType> dem,
 			/*
 			 * drag term
 			 */
-			if (dv_mod2 > 0) {
-				const double dv_mod = sqrt(dv_mod2);
-
-				const double Rep = dem_diameter*ej*dv_mod/sph_visc;
-				const double Cd = 24.0/Rep;
-				const double beta_times_vol = (1.0/8.0)*Cd*PI*rhoj*pow(dem_diameter,2)*dv_mod;
-				fdrag -= beta_times_vol*dv*Wdv/(ej);
-
-//				const double Rep = dem_diameter*dv_mod/sph_visc;
+//			if (dv_mod2 > 0) {
+//				const double dv_mod = sqrt(dv_mod2);
+//
+//				const double Rep = dem_diameter*ej*dv_mod/sph_visc;
 //				const double Cd = 24.0/Rep;
-//				const double beta_times_vol = (1.0/8.0)*Cd*PI*sph_dens*pow(dem_diameter,2)*dv_mod;
-//				fdrag = -beta_times_vol*v;
+//				const double beta_times_vol = (1.0/8.0)*Cd*PI*rhoj*pow(dem_diameter,2)*dv_mod;
+//				fdrag -= beta_times_vol*dv*Wdv/(ej);
+//
+////				const double Rep = dem_diameter*dv_mod/sph_visc;
+////				const double Cd = 24.0/Rep;
+////				const double beta_times_vol = (1.0/8.0)*Cd*PI*sph_dens*pow(dem_diameter,2)*dv_mod;
+////				fdrag = -beta_times_vol*v;
+//
+//
+//			}
 
+			/*
+			 * viscosity
+			 */
+			fdrag -= sph_mass*dv*(sph_visc + sph_visc)*gamma->get_phi(hj,r);
 
-			}
 			/*
 			 * pressure gradient from fluid
 			 */
 			if (r > 0) {
-				const double fdashj = F(q,hj);
-				f0 -= sph_mass*omegaj*pdr2j*kappaj*fdashj*dx;
+				const Vect3d volGradW = gamma->get_gamma_r(hj,r)*dx/r;
+				f0 += sph_mass*omegaj*pdr2j*kappaj*volGradW;
 
 			}
 			//f0 += fj*Wdv;
@@ -480,13 +489,14 @@ void sphdem(ptr<SphType> sph,ptr<DemType> dem,
 
 		fdrag /= dem_mass;
 		fdrag << 0,0,0;
+		f0 /= dem_mass;
 //		if (s > 0.5) {
 //			f0 *= sph_dens/s;
 //			f0 *= (dem_vol/dem_mass);
 //		} else {
 //			f0 << 0,0,0;
 //		}
-		f0 *= dem_vol;
+		//f0 *= dem_vol;
 		//std::cout <<"f0 = "<<f0<<" omega = "<<omegad<<" kappa = "<<kappad<<std::endl;
 
 	});

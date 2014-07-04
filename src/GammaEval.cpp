@@ -131,7 +131,7 @@ double bicubicInterpolate (double p[4][4], const double x, const double y) {
 #define LINEAR
 double GammaEval::interpolate(Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> &data, const double h, const double r) {
 	if ((h < h_min)||(h >= h_max)||(r < r_min)||(r >= r_max)) {
-		std::cerr << "evaluating gamma outside limits at h = "<<h<<" and r = "<<r<<std::endl;
+		std::cerr << "evaluating gamma outside limits (h_min,h_max,r_min,r_max) = "<<h_min<<","<<h_max<<","<<r_min<<","<<r_max<<" at h = "<<h<<" and r = "<<r<<std::endl;
 		exit(-1);
 	}
 	const double dh = (h_max-h_min)/n_h;
