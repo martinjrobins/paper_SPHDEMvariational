@@ -101,7 +101,7 @@ typedef Particles<SphTuple> SphType;
 
 
 struct Params {
-	double sph_dt,sph_mass,sph_hfac,sph_visc,sph_refd,sph_gamma,sph_spsound,sph_prb,sph_dens,sph_maxh,sph_time_damping;
+	double sph_dt,sph_mass,sph_hfac,sph_visc,sph_refd,sph_gamma,sph_spsound,sph_prb,sph_dens,sph_maxh,sph_time_damping,sph_inletv;
 	double dem_dt,dem_mass,dem_diameter,dem_k,dem_gamma, dem_vol, dem_time_drop;
 	double time;
 };
@@ -263,7 +263,8 @@ void sphdem(ptr<SphType> sph,ptr<DemType> dem,
 		const double alphaf = h*alpha*invDe;
 		//kappa = (rho + alphaf)/(1.0-betaf);
 		kappa = rho;
-		omega = 1.0/(e + (h/(NDIM*rho))*(alpha + beta*kappa));
+		//omega = 1.0/(e + (h/(NDIM*rho))*(alpha + beta*kappa));
+		omega = 1.0/e;
 		//if (found) std::cout << "dem_vol = "<<dem_vol<<" e = "<<e<<" omega = "<<omega<<" rho = "<<rho<<" kappa = "<<kappa<<" alpha = "<<alpha<<" beta = "<<beta<<" beta_s = "<<beta_s<<" e_s = "<<e_s<<std::endl;
 	});
 
@@ -317,7 +318,7 @@ void sphdem(ptr<SphType> sph,ptr<DemType> dem,
 		REGISTER_SPH_PARTICLE(i);
 		rho += dt * dddt;
 		//h = pow(sph_mass/(e*rho),1.0/NDIM);
-		h = pow(sph_mass/(rho),1.0/NDIM);
+		//h = pow(sph_mass/(rho),1.0/NDIM);
 	});
 	auto iterator_to_maxh =
 	    std::max_element(sph->begin(),sph->end(),[](SphType::Value& i, SphType::Value& j){
@@ -419,6 +420,7 @@ void sphdem(ptr<SphType> sph,ptr<DemType> dem,
 			if (r>0) fdem -= gamma->get_gamma_r(h,r)*dx/r;
 			found = true;
 
+
 		}
 //		if (e > 0) {
 //			fdrag /= (rho*e);
@@ -470,25 +472,31 @@ void sphdem(ptr<SphType> sph,ptr<DemType> dem,
 //
 //
 //			}
+//			const double dv_mod = sqrt(dv_mod2);
+//			const double Rep = dem_diameter*ej*dv_mod/sph_visc;
+//			const double Cd = 24.0/Rep;
+//			const double beta_div_rho = -(3.0/14.0)*Cd*dv_mod*pow(hj,2)/dem_diameter;
+
+			const double beta_div_rho = 2*sph_visc;
 
 			/*
 			 * viscosity
 			 */
-			fdrag -= sph_mass*dv*(sph_visc + sph_visc)*gamma->get_phi(hj,r);
+			fdrag += sph_mass*dv*beta_div_rho*gamma->get_phi(hj,r);
 
 			/*
 			 * pressure gradient from fluid
 			 */
 			if (r > 0) {
 				const Vect3d volGradW = gamma->get_gamma_r(hj,r)*dx/r;
-				f0 += sph_mass*omegaj*pdr2j*kappaj*volGradW;
+				f0 -= sph_mass*omegaj*pdr2j*kappaj*volGradW;
 
 			}
 			//f0 += fj*Wdv;
 		}
 
 		fdrag /= dem_mass;
-		fdrag << 0,0,0;
+		//fdrag << 0,0,0;
 		f0 /= dem_mass;
 //		if (s > 0.5) {
 //			f0 *= sph_dens/s;

@@ -24,6 +24,10 @@
 
 #include "sphdem.h"
 #include "Visualisation.h"
+#include <string>
+#include <iostream>     // std::cout, std::right, std::endl
+#include <stdio.h>
+
 
 #include <vtkFloatArray.h>
 
@@ -33,16 +37,26 @@ int main(int argc, char **argv) {
 	auto sph = SphType::New();
 	auto params = ptr<Params>(new Params());
 
-	const int timesteps = 20000;
+	const int timesteps = 2000;
 	const int nout = 100;
 	const int timesteps_per_out = timesteps/nout;
 	const double L = 0.004;
 	const int nx = 20;
 
+	const double Re = 1.0;
+
+
+	if (argc < 2) {
+		params->dem_diameter = 0.0006;
+	} else {
+		params->dem_diameter = 0.0006*atof(argv[1]);
+	}
+	std::cout << "using diameter = "<<params->dem_diameter<<std::endl;
+	char dir[100];
+	sprintf(dir, "results_diameter_%s", argv[1]);
 
 	 /* dem parameters
 	 */
-	params->dem_diameter = 0.0008;
 	params->dem_gamma = 0.0;
 	params->dem_k = 10;
 	params->dem_vol = (1.0/6.0)*PI*pow(params->dem_diameter,3);
@@ -58,10 +72,13 @@ int main(int argc, char **argv) {
 	 */
 	params->sph_hfac = 1.5;
 	params->sph_visc = 8.9e-07;
+	params->sph_inletv = Re*params->sph_visc/params->dem_diameter;
 	params->sph_refd = 1000.0;
 	params->sph_dens = 1000.0;
 	params->sph_gamma = 7;
-	const double VMAX = 2.0*sqrt(2*9.81*L);
+	//const double VMAX = 2.0*sqrt(2*9.81*L);
+	const double VMAX = params->sph_inletv;
+
 	const double CSFAC = 10.0;
 	params->sph_spsound = CSFAC*VMAX;
 	params->sph_prb = pow(params->sph_refd/params->sph_dens,params->sph_gamma-1.0)*pow(params->sph_spsound,2)*params->sph_refd/params->sph_gamma;
@@ -72,8 +89,10 @@ int main(int argc, char **argv) {
 	std::cout << "h = "<<params->sph_hfac*psep<<" vmax = "<<VMAX<<" psep = "<<psep<<std::endl;
 	std::cout << "sph_dt = "<<params->sph_dt<<" 1/20 m/b = "<<(1.0/20.0)*params->dem_mass/(3.0*PI*params->sph_dens*params->sph_visc*params->dem_diameter)<<std::endl;
 	std::cout << "dem_dt = "<<params->dem_dt<<std::endl;
+	std::cout << "2*params->sph_maxh + params->dem_diameter/2.0 = "<<2*params->sph_maxh + params->dem_diameter/2.0<<std::endl;
+	std::cout << " Re = "<<params->dem_diameter*params->sph_inletv/params->sph_visc<<std::endl;
 
-	params->dem_time_drop = params->sph_dt*timesteps/8.0;
+	params->dem_time_drop = params->sph_dt*timesteps;
 	params->time = 0;
 	params->sph_maxh = params->sph_hfac*psep;
 
@@ -83,33 +102,18 @@ int main(int argc, char **argv) {
 	 */
 	auto dem_geometry = [params](DemType::Value& i) {
 		Vect3d acceleration;
-		acceleration << 0,0,-9.8;
-		REGISTER_DEM_PARTICLE(i);
-		const double dem_diameter = params->dem_diameter;
-		const double dem_k = params->dem_k;
-		const double dem_gamma = params->dem_gamma;
-		const double dem_mass = params->dem_mass;
-		const double dem_vol = params->dem_vol;
-
-		const double overlap = dem_diameter/2.0-r[2];
-		if (overlap>0) {
-			const double overlap_dot = -v[2];
-			const Vect3d normal(0,0,1);
-			acceleration += (dem_k*overlap + dem_gamma*overlap_dot)*normal/dem_mass;
-		}
-		
+		acceleration << 0,0,0;
 		return acceleration;
 	};
 
 	auto sph_geometry = [](SphType::Value& i) {
 		Vect3d acceleration;
-		acceleration << 0,0,-9.8;
+		acceleration << 0,0,0;
 		return acceleration;
 	};
 
 	const Vect3d min(0,0,-3.0*psep);
 	const Vect3d max(L,L,L);
-	const Vect3d max_domain(L,L,L*2);
 	const Vect3b periodic(true,true,false);
 
 	dem->create_particles(1,[L](DemType::Value& i) {
@@ -118,7 +122,7 @@ int main(int argc, char **argv) {
 		v0 << 0,0,0;
 		f << 0,0,0;
 		f0 << 0,0,0;
-		return Vect3d(L/2,L/2,L);
+		return Vect3d(L/2,L/2,L/2);
 	});
 
 	/*
@@ -128,13 +132,9 @@ int main(int argc, char **argv) {
 	gamma->reset_limits(params->sph_maxh*0.5,params->sph_maxh*1.5,0.0,3.0*params->sph_maxh+params->dem_diameter/2.0,100,100);
 
 
-
-
-
-
 	std::cout << "starting...."<<std::endl;
-	sph->init_neighbour_search(min,max_domain,2*params->sph_maxh,periodic);
-	dem->init_neighbour_search(min,max_domain,2*params->sph_maxh + params->dem_diameter/2.0,periodic);
+	sph->init_neighbour_search(min,max,2*params->sph_maxh,periodic);
+	dem->init_neighbour_search(min,max,2*params->sph_maxh + params->dem_diameter/2.0,periodic);
 
 	/*
 	 * create sph and dem particles
@@ -144,19 +144,14 @@ int main(int argc, char **argv) {
 		h = params->sph_maxh;
 		omega = 1.0;
 		kappa = 0.0;
-		v << 0,0,0;
-		v0 << 0,0,0;
+		v << 0,0,params->sph_inletv;
+		v0 << 0,0,params->sph_inletv;
 		dddt = 0;
 		e = 1;
 		rho = params->sph_dens;
 		f << 0,0,0;
 		fdrag << 0,0,0;
 		f0 << 0,0,0;
-		if ((r[1]<2) || (r[1]>nx-2)){
-			fixed = true;
-		} else {
-			fixed = false;
-		}
 		if (r[2]<0) {
 			fixed = true;
 		} else {
@@ -205,20 +200,67 @@ int main(int argc, char **argv) {
 	auto dem_grid = vtkSmartPointer<vtkUnstructuredGrid>::New();
 	sph->copy_to_vtk_grid(sph_grid);
 	dem->copy_to_vtk_grid(dem_grid);
-	Visualisation::vtkWriteGrid("vis/at_start_sph",0,sph_grid);
-	Visualisation::vtkWriteGrid("vis/at_start_dem",0,dem_grid);
 
+	char sph_name[100];
+	sprintf(sph_name, "%s/at_start_sph", dir);
+	char dem_name[100];
+	sprintf(dem_name, "%s/at_start_dem", dir);
+	Visualisation::vtkWriteGrid(sph_name,0,sph_grid);
+	Visualisation::vtkWriteGrid(dem_name,0,dem_grid);
+
+	double next_layer_time = 0.5*psep/params->sph_inletv;
 	for (int i = 0; i < nout; ++i) {
 		for (int k = 0; k < timesteps_per_out; ++k) {
 			//std::this_thread::sleep_for(std::chrono::seconds(1));
 			sphdem(sph,dem,params,sph_geometry,dem_geometry,gamma);
+
+			/*
+			 * convert fixed to nonfixed sph particles
+			 */
+			std::for_each(sph->begin(),sph->end(),[L,gamma,sph,dem,params](SphType::Value& i) {
+					REGISTER_SPH_PARTICLE(i);
+					if (r[2]<0) {
+						fixed = true;
+					} else {
+						fixed = false;
+					}
+					if (r[2]>L) {
+						i.mark_for_deletion();
+					}
+			});
+			sph->delete_particles();
+
+
+			/*
+			 * add new layer if neccessary
+			 */
+			if (params->time > next_layer_time) {
+				sph->create_particles_grid(min,Vect3d(max[0],max[1],min[2]),Vect3i(nx,nx,1),[dem,psep,params](SphType::Value& i) {
+					REGISTER_SPH_PARTICLE(i);
+					h = params->sph_maxh;
+					omega = 1.0;
+					kappa = 0.0;
+					v << 0,0,params->sph_inletv;
+					v0 << 0,0,params->sph_inletv;
+					dddt = 0;
+					e = 1;
+					rho = params->sph_dens;
+					f << 0,0,0;
+					fdrag << 0,0,0;
+					f0 << 0,0,0;
+					fixed = true;
+				});
+				next_layer_time += psep / params->sph_inletv;
+			}
 		}
 		std::cout <<"iteration "<<i<<std::endl;
-		
+
 		sph->copy_to_vtk_grid(sph_grid);
 		dem->copy_to_vtk_grid(dem_grid);
-		Visualisation::vtkWriteGrid("vis/sph",i,sph_grid);
-		Visualisation::vtkWriteGrid("vis/dem",i,dem_grid);
+		sprintf(sph_name, "%s/sph", dir);
+		sprintf(dem_name, "%s/dem", dir);
+		Visualisation::vtkWriteGrid(sph_name,i,sph_grid);
+		Visualisation::vtkWriteGrid(dem_name,i,dem_grid);
 	}
 	
 	
