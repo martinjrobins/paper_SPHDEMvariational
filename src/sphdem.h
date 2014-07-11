@@ -100,10 +100,14 @@ typedef Particles<SphTuple> SphType;
 				const GET_TUPLE(double,kappaj,SPH_KAPPA,j)
 
 
+enum HMode {CONST_H,H_WITH_DENS,H_WITH_E_AND_DENS};
+enum ViscMode {MACRO,MICRO};
 struct Params {
 	double sph_dt,sph_mass,sph_hfac,sph_visc,sph_refd,sph_gamma,sph_spsound,sph_prb,sph_dens,sph_maxh,sph_time_damping,sph_inletv;
 	double dem_dt,dem_mass,dem_diameter,dem_k,dem_gamma, dem_vol, dem_time_drop;
 	double time;
+	enum HMode hmode;
+	enum ViscMode viscmode;
 };
 
 
@@ -217,7 +221,7 @@ void sphdem(ptr<SphType> sph,ptr<DemType> dem,
 	 * Calculate omega and kappa and porosity
 	 */
 	//std::cout << "calculate omega"<<std::endl;
-	std::for_each(sph->begin(),sph->end(),[gamma,sph,dem,sph_mass,dem_vol,dem_diameter](SphType::Value& i) {
+	std::for_each(sph->begin(),sph->end(),[params,gamma,sph,dem,sph_mass,dem_vol,dem_diameter](SphType::Value& i) {
 		REGISTER_SPH_PARTICLE(i);
 		double alpha = -(0+NDIM*W(0,h));
 		for (auto tpl: i.get_neighbours(sph)) {
@@ -261,10 +265,17 @@ void sphdem(ptr<SphType> sph,ptr<DemType> dem,
 		const double invDe = 1.0/(NDIM*e);
 		const double betaf = beta*h*invDe;
 		const double alphaf = h*alpha*invDe;
-		//kappa = (rho + alphaf)/(1.0-betaf);
-		kappa = rho;
-		//omega = 1.0/(e + (h/(NDIM*rho))*(alpha + beta*kappa));
-		omega = 1.0/e;
+		if (params->hmode == H_WITH_E_AND_DENS) {
+			kappa = (rho + alphaf)/(1.0-betaf);
+		} else {
+			kappa = rho;
+		}
+		if (params->hmode == CONST_H) {
+			omega = 1.0/e;
+		} else {
+			omega = 1.0/(e + (h/(NDIM*rho))*(alpha + beta*kappa));
+
+		}
 		//if (found) std::cout << "dem_vol = "<<dem_vol<<" e = "<<e<<" omega = "<<omega<<" rho = "<<rho<<" kappa = "<<kappa<<" alpha = "<<alpha<<" beta = "<<beta<<" beta_s = "<<beta_s<<" e_s = "<<e_s<<std::endl;
 	});
 
@@ -314,11 +325,14 @@ void sphdem(ptr<SphType> sph,ptr<DemType> dem,
 	integrate_dem(dt/2,dem,params,dem_geometry); //update dem positions
 
 
-	std::for_each(sph->begin(),sph->end(),[dt,sph_mass](SphType::Value& i) {
+	std::for_each(sph->begin(),sph->end(),[params,dt,sph_mass](SphType::Value& i) {
 		REGISTER_SPH_PARTICLE(i);
 		rho += dt * dddt;
-		//h = pow(sph_mass/(e*rho),1.0/NDIM);
-		//h = pow(sph_mass/(rho),1.0/NDIM);
+		if (params->hmode == H_WITH_E_AND_DENS) {
+			h = pow(sph_mass/(e*rho),1.0/NDIM);
+		} else if (params->hmode == H_WITH_DENS) {
+			h = pow(sph_mass/(rho),1.0/NDIM);
+		}
 	});
 	auto iterator_to_maxh =
 	    std::max_element(sph->begin(),sph->end(),[](SphType::Value& i, SphType::Value& j){
@@ -438,7 +452,7 @@ void sphdem(ptr<SphType> sph,ptr<DemType> dem,
 	 */
 	//std::cout << "calculate coupling force on DEM"<<std::endl;
 	sph->reset_neighbour_search(2.0*sph_maxh+dem_diameter/2.0);
-	std::for_each(dem->begin(),dem->end(),[gamma,sph,dem_vol,sph_mass,sph_visc,dem_diameter,sph_dens,dem_mass](DemType::Value& i) {
+	std::for_each(dem->begin(),dem->end(),[params,gamma,sph,dem_vol,sph_mass,sph_visc,dem_diameter,sph_dens,dem_mass](DemType::Value& i) {
 		REGISTER_DEM_PARTICLE(i);
 
 		f0 << 0,0,0;
@@ -472,12 +486,15 @@ void sphdem(ptr<SphType> sph,ptr<DemType> dem,
 //
 //
 //			}
-//			const double dv_mod = sqrt(dv_mod2);
-//			const double Rep = dem_diameter*ej*dv_mod/sph_visc;
-//			const double Cd = 24.0/Rep;
-//			const double beta_div_rho = -(3.0/14.0)*Cd*dv_mod*pow(hj,2)/dem_diameter;
-
-			const double beta_div_rho = 2*sph_visc;
+			double beta_div_rho;
+			if (params->viscmode == MICRO) {
+				const double dv_mod = sqrt(dv_mod2);
+				const double Rep = dem_diameter*ej*dv_mod/sph_visc;
+				const double Cd = 24.0/Rep;
+				beta_div_rho = -(3.0/14.0)*Cd*dv_mod*pow(hj,2)/dem_diameter;
+			} else {
+				beta_div_rho = 2*sph_visc;
+			}
 
 			/*
 			 * viscosity

@@ -40,20 +40,33 @@ int main(int argc, char **argv) {
 	const int timesteps = 2000;
 	const int nout = 100;
 	const int timesteps_per_out = timesteps/nout;
-	const double L = 0.004;
-	const int nx = 20;
+	const double L = 0.008;
+	const int nx = 40;
 
 	const double Re = 1.0;
 
-
+	double factor;
 	if (argc < 2) {
 		params->dem_diameter = 0.0006;
+		factor = 1.0;
 	} else {
 		params->dem_diameter = 0.0006*atof(argv[1]);
+		factor = atof(argv[1]);
+	}
+	if (argc < 3) {
+		params->hmode = CONST_H;
+	} else {
+		params->hmode = (enum HMode) atoi(argv[2]);
+	}
+	if (argc < 4) {
+		params->viscmode = MACRO;
+	} else {
+		params->viscmode = (enum ViscMode) atoi(argv[3]);
 	}
 	std::cout << "using diameter = "<<params->dem_diameter<<std::endl;
 	char dir[100];
-	sprintf(dir, "results_diameter_%s", argv[1]);
+	sprintf(dir, "results_diameter_%0.1f_hmode_%d_viscmode_%d", factor,params->hmode,params->viscmode);
+	std::cout << "hmode = "<<params->hmode<<" viscmode = "<<params->viscmode<<std::endl;
 
 	 /* dem parameters
 	 */
