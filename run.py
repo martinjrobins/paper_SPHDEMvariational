@@ -2,7 +2,7 @@ from multiprocessing import Pool
 import os
 
 def f(x):
-    factor = x/10.0
+    factor = (23.0-x)/10.0
     for viscmode in range(2):
         d = "results_diameter_%0.1f_hmode_%d_viscmode_%d"%(factor,0,viscmode)
         print d

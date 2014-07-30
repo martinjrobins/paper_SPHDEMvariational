@@ -37,7 +37,7 @@ int main(int argc, char **argv) {
 	auto sph = SphType::New();
 	auto params = ptr<Params>(new Params());
 
-	const int timesteps = 2000;
+	const int timesteps = 4000;
 	const int nout = 100;
 	const int timesteps_per_out = timesteps/nout;
 	const double L = 0.008;
@@ -106,6 +106,7 @@ int main(int argc, char **argv) {
 	std::cout << " Re = "<<params->dem_diameter*params->sph_inletv/params->sph_visc<<std::endl;
 
 	params->dem_time_drop = params->sph_dt*timesteps;
+	params->sph_time_damping = 0;
 	params->time = 0;
 	params->sph_maxh = params->sph_hfac*psep;
 
@@ -126,7 +127,7 @@ int main(int argc, char **argv) {
 	};
 
 	const Vect3d min(0,0,-3.0*psep);
-	const Vect3d max(L,L,L);
+	const Vect3d max(L,L,L+3.0*psep);
 	const Vect3b periodic(true,true,false);
 
 	dem->create_particles(1,[L](DemType::Value& i) {
@@ -152,7 +153,7 @@ int main(int argc, char **argv) {
 	/*
 	 * create sph and dem particles
 	 */
-	sph->create_particles_grid(min,max,Vect3i(nx,nx,nx+3),[dem,psep,params](SphType::Value& i) {
+	sph->create_particles_grid(min,max,Vect3i(nx,nx,nx+6),[L,dem,psep,params](SphType::Value& i) {
 		REGISTER_SPH_PARTICLE(i);
 		h = params->sph_maxh;
 		omega = 1.0;
@@ -167,6 +168,8 @@ int main(int argc, char **argv) {
 		f0 << 0,0,0;
 		if (r[2]<0) {
 			fixed = true;
+		} else if (r[2]>L) {
+			fixed = true;
 		} else {
 			fixed = false;
 		}
@@ -175,7 +178,7 @@ int main(int argc, char **argv) {
 			REGISTER_NEIGHBOUR_DEM_PARTICLE(tpl);
 			const double r2 = dx.squaredNorm();
 			if (r2 < pow(params->dem_diameter/2.0,2)) {
-				std::cout << "removing sph at r = "<<r<<" |r| = "<<sqrt(r2)<<"dist = "<<2*h+params->dem_diameter/2.0<<" dx = "<<dx<<std::endl;
+				//std::cout << "removing sph at r = "<<r<<" |r| = "<<sqrt(r2)<<"dist = "<<2*h+params->dem_diameter/2.0<<" dx = "<<dx<<std::endl;
 				i.mark_for_deletion();
 			}
 		}
@@ -190,6 +193,7 @@ int main(int argc, char **argv) {
 	std::for_each(sph->begin(),sph->end(),[gamma,sph,dem,params](SphType::Value& i) {
 		REGISTER_SPH_PARTICLE(i);
 		e = 1;
+		rho = 0;
 		//bool found = false;
 		for (auto tpl: i.get_neighbours(dem)) {
 			REGISTER_NEIGHBOUR_DEM_PARTICLE(tpl);
@@ -200,6 +204,21 @@ int main(int argc, char **argv) {
 			//std::cout <<" particle at r = "<<r<<" absr = "<<absr<<" dx = "<<dx<<" e = "<<e<<std::endl;
 
 			//found = true;
+		}
+		if (e < 1.0) {
+			for (auto tpl: i.get_neighbours(sph)) {
+				REGISTER_NEIGHBOUR_SPH_PARTICLE(tpl);
+				const double r2 = dx.squaredNorm();
+				if (r2 > pow(2*h,2)) continue;
+				const double r = sqrt(r2);
+				rho += params->sph_mass*W(r/h,h);
+				//std::cout <<" particle at r = "<<r<<" absr = "<<absr<<" dx = "<<dx<<" e = "<<e<<std::endl;
+
+				//found = true;
+			}
+			rho /= e;
+		} else {
+			rho = params->sph_dens;
 		}
 		//h = pow(params->sph_mass/(e*rho),1.0/NDIM);
 
@@ -230,14 +249,18 @@ int main(int argc, char **argv) {
 			/*
 			 * convert fixed to nonfixed sph particles
 			 */
-			std::for_each(sph->begin(),sph->end(),[L,gamma,sph,dem,params](SphType::Value& i) {
+			std::for_each(sph->begin(),sph->end(),[psep,L,gamma,sph,dem,params](SphType::Value& i) {
 					REGISTER_SPH_PARTICLE(i);
 					if (r[2]<0) {
 						fixed = true;
+					} else if (r[2]>L) {
+						fixed = true;
+						v << 0,0,params->sph_inletv;
+						v0 << 0,0,params->sph_inletv;
 					} else {
 						fixed = false;
 					}
-					if (r[2]>L) {
+					if (r[2]>=L+3.0*psep) {
 						i.mark_for_deletion();
 					}
 			});

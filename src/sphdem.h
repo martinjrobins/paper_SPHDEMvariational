@@ -491,7 +491,7 @@ void sphdem(ptr<SphType> sph,ptr<DemType> dem,
 				const double dv_mod = sqrt(dv_mod2);
 				const double Rep = dem_diameter*ej*dv_mod/sph_visc;
 				const double Cd = 24.0/Rep;
-				beta_div_rho = -(3.0/14.0)*Cd*dv_mod*pow(hj,2)/dem_diameter;
+				beta_div_rho = (3.0/14.0)*Cd*dv_mod*pow(hj,2)/dem_diameter;
 			} else {
 				beta_div_rho = 2*sph_visc;
 			}
